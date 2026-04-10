@@ -1,0 +1,84 @@
+# 银行业RAG问答系统配置文件
+
+# 数据配置
+data:
+  dataset_id: "eggbiscuit/DISC-FIN-SFT"  # Hugging Face 数据集ID
+  filter_banking: true  # 是否过滤银行相关数据
+  perplexity_threshold: 100.0  # 困惑度阈值
+  prompt_template: "问题：{question}\n答案："  # 提示模板
+  lora_output_path: "./data/processed/lora_data.json"  # LoRA训练数据输出路径
+  dpo_output_path: "./data/processed/dpo_data.json"  # DPO训练数据输出路径
+
+# 模型路径配置
+models:
+  base_model_path: "./models/Baichuan2-7B-Base"  # Baichuan2基础模型路径
+  embedding_model_path: "./models/bge-m3"  # BGE-M3嵌入模型路径
+  rerank_model_path: "./models/bge-m3-reranker"  # BGE-M3重排序模型路径
+  lora_adapter_path: "./models/lora_adapter"  # LoRA适配器保存路径
+  dpo_model_path: "./models/dpo_model"  # DPO优化模型保存路径
+  finetuned_embedding_path: "./models/finetuned_embedding"  # 微调嵌入模型路径
+  finetuned_rerank_path: "./models/finetuned_rerank"  # 微调重排序模型路径
+
+# LoRA训练超参数
+lora:
+  rank: 8  # LoRA秩
+  alpha: 16  # LoRA alpha
+  dropout: 0.05  # Dropout率
+  learning_rate: 0.0001  # 学习率
+  batch_size: 4  # 批次大小
+  epochs: 3  # 训练轮数
+  gradient_accumulation_steps: 4  # 梯度累积步数
+  warmup_steps: 100  # 预热步数
+  logging_steps: 10  # 日志记录间隔
+
+# DPO训练超参数
+dpo:
+  beta: 0.1  # DPO beta参数
+  learning_rate: 0.00005  # 学习率
+  batch_size: 2  # 批次大小
+  epochs: 2  # 训练轮数
+  gradient_accumulation_steps: 8  # 梯度累积步数
+  warmup_steps: 50  # 预热步数
+  logging_steps: 10  # 日志记录间隔
+
+# RAG配置
+rag:
+  chunk_max_tokens: 512  # 每个块的最大令牌数
+  chunk_overlap: 50  # 块之间的重叠令牌数
+  retrieval_top_k: 10  # 检索的top-k块数
+  rerank_top_n: 5  # 重排序后保留的top-n块数
+  context_template: "参考信息：\n{context}\n\n问题：{question}\n答案："  # 上下文模板
+  vector_db_path: "./data/vector_db"  # 向量数据库保存路径
+  
+  # 自适应检索参数
+  adaptive:
+    simple_query_top_k: 5  # 简单查询的top-k
+    medium_query_top_k: 10  # 中等查询的top-k
+    complex_query_top_k: 15  # 复杂查询的top-k
+
+# 推理生成参数
+inference:
+  temperature: 0.7  # 生成温度
+  max_tokens: 512  # 最大生成令牌数
+  top_p: 0.9  # Top-p采样
+  repetition_penalty: 1.1  # 重复惩罚
+
+# GPT-4 API配置（用于风格优化）
+gpt4:
+  api_key: ""  # OpenAI API密钥（需要用户填写）
+  model: "gpt-4"  # 使用的模型
+  max_retries: 3  # 最大重试次数
+  retry_delay: 1.0  # 重试延迟（秒）
+
+# 日志配置
+logging:
+  level: "INFO"  # 日志级别：DEBUG, INFO, WARNING, ERROR, CRITICAL
+  console: true  # 是否输出到控制台
+  file: true  # 是否输出到文件
+  log_file_path: "./logs/system.log"  # 日志文件路径
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"  # 日志格式
+
+# 评估配置
+evaluation:
+  test_data_path: "./data/test_set.json"  # 测试集路径
+  baseline_trulen_score: 67.2  # 基线TruLen分数
