@@ -4,7 +4,7 @@
 data:
   dataset_id: "eggbiscuit/DISC-FIN-SFT"  # Hugging Face 数据集ID
   filter_banking: true  # 是否过滤银行相关数据
-  perplexity_threshold: 100.0  # 困惑度阈值
+  perplexity_threshold: 10000.0  # 困惑度阈值
   prompt_template: "问题：{question}\n答案："  # 提示模板
   lora_output_path: "./data/processed/lora_data.json"  # LoRA训练数据输出路径
   dpo_output_path: "./data/processed/dpo_data.json"  # DPO训练数据输出路径
