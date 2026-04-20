@@ -1,6 +1,6 @@
 # 银行业RAG问答系统
 
-基于Baichuan2和BGE-M3的银行领域智能问答系统，结合LoRA微调、DPO优化和自适应RAG技术。
+基于Qwen和BGE的银行领域智能问答系统，结合LoRA微调、DPO优化和自适应RAG技术。
 
 ## 系统概述
 
