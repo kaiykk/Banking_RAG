@@ -1,162 +1,184 @@
-# 银行业RAG问答系统
+# Banking RAG
 
-基于Qwen和BGE的银行领域智能问答系统，结合LoRA微调、DPO优化和自适应RAG技术。
+面向银行业务问答场景的 RAG 与模型微调实验项目。仓库目前聚焦三件事：
 
-## 系统概述
+- 用配置文件统一管理数据、模型、LoRA、DPO、RAG 和日志参数
+- 提供 LoRA SFT 与 DPO 偏好优化训练入口
+- 为后续银行领域数据处理、向量检索、重排序和推理服务预留 CLI 流程
 
-本系统是一个企业级银行问答解决方案，主要特点包括：
+> 当前代码仍处于实验/搭建阶段。`train-lora` 和 `train-dpo` 已有实现；`setup-rag` 与 `inference` 是预留命令；`process-data` 入口已声明，但依赖的 `src.data.processor` 模块尚未提交到仓库。
 
-- **领域微调模型**: 使用LoRA和DPO技术微调Baichuan2-7B模型
-- **高精度检索**: BGE-M3双重微调（嵌入+重排序）
-- **自适应RAG**: 受PageIndex启发的智能检索策略
-- **向量数据库**: 基于FAISS的高效向量检索
-- **金融数据集**: 使用DISC-FIN-SFT标注的银行金融数据
+## Features
 
-## 项目结构
+### Implemented
 
+- `ConfigManager`: 支持 YAML / JSON 配置加载、必填项校验、默认值补齐和点号路径读取。
+- `Logger`: 统一控制台与文件日志输出。
+- `LoRATrainer`: 基于 `transformers`、`datasets`、`peft` 的因果语言模型 LoRA 微调流程。
+- `DPOOptimizer`: 基于 `trl` 的 DPO 偏好优化流程，兼容不同版本 `DPOTrainer` 的 `tokenizer` / `processing_class` 参数。
+- CLI:
+  - `train-lora`
+  - `train-dpo`
+  - `process-data`（入口存在，数据处理模块待补齐）
+  - `setup-rag`（预留）
+  - `inference`（预留）
+
+### Planned
+
+- 银行业数据抽取、清洗、过滤与 SFT / DPO 数据构造
+- BGE-M3 embedding 与 reranker 微调
+- FAISS 向量库构建
+- 自适应检索策略
+- 银行业问答推理链路
+- 评估指标与回归测试
+
+## Project Structure
+
+```text
+Banking_RAG/
+├── config.yaml              # 默认运行配置
+├── config.run312.yaml       # 备用/实验运行配置
+├── requirements.txt         # Python 依赖
+├── src/
+│   ├── config_manager.py    # 配置加载、校验与默认值
+│   ├── logger.py            # 日志封装
+│   ├── cli/
+│   │   └── main.py          # 命令行入口
+│   └── training/
+│       ├── lora_trainer.py  # LoRA SFT 训练
+│       └── dpo_optimizer.py # DPO 偏好优化
+└── README.md
 ```
-banking-rag-qa-system/
-├── config.yaml              # 系统配置文件
-├── requirements.txt         # Python依赖项
-├── README.md               # 项目说明文档
-├── src/                    # 源代码目录
-│   ├── __init__.py
-│   ├── config_manager.py   # 配置管理器
-│   ├── logger.py          # 日志记录器
-│   ├── data/              # 数据处理模块
-│   ├── training/          # 训练流程模块
-│   ├── rag/               # RAG系统模块
-│   ├── inference/         # 推理引擎模块
-│   └── cli/               # 命令行界面
-├── data/                   # 数据目录
-│   ├── processed/         # 处理后的数据
-│   └── vector_db/         # 向量数据库
-├── models/                 # 模型目录
-│   ├── Baichuan2-7B-Base/ # 基础模型
-│   ├── bge-m3/            # 嵌入模型
-│   ├── lora_adapter/      # LoRA适配器
-│   └── dpo_model/         # DPO优化模型
-└── logs/                   # 日志目录
+
+运行过程中会按配置使用或生成以下本地目录，这些目录不包含在仓库中：
+
+```text
+data/
+  processed/
+  vector_db/
+models/
+  Baichuan2-7B-Base/
+  bge-m3/
+  lora_adapter/
+  dpo_model/
+logs/
 ```
 
-## 快速开始
+## Requirements
 
-### 1. 环境准备
+- Python 3.10+ recommended
+- PyTorch 2.x
+- `transformers`
+- `datasets`
+- `peft`
+- `trl`
+- `accelerate`
+- `faiss-cpu`
+- `sentence-transformers`
+
+Install dependencies:
 
 ```bash
-# 创建虚拟环境
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# 安装依赖
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. 配置系统
+If you train large language models locally, prepare a CUDA-capable environment and place the base model files under the paths configured in `config.yaml`.
 
-编辑 `config.yaml` 文件，配置以下内容：
+## Configuration
 
-- 数据集ID（默认使用DISC-FIN-SFT）
-- 模型路径
-- 训练超参数
-- RAG参数
-- GPT-4 API密钥（用于风格优化）
+The default config is [config.yaml](config.yaml). Key sections:
 
-### 3. 数据处理
+| Section | Purpose |
+| --- | --- |
+| `data` | Dataset id, banking filter switch, output paths for SFT and DPO data |
+| `models` | Base model, embedding model, reranker, LoRA adapter and DPO output paths |
+| `lora` | LoRA rank, alpha, dropout, learning rate, batch size and training steps |
+| `dpo` | DPO beta, learning rate, batch size and training steps |
+| `rag` | Chunk size, retrieval top-k, rerank top-n and vector DB path |
+| `inference` | Generation temperature, max tokens, top-p and repetition penalty |
+| `logging` | Log level, console/file output and log file path |
+| `evaluation` | Test data path and baseline score placeholder |
 
-```bash
-# 加载和处理数据集
-python -m src.cli.main process-data
+Before training, update at least these paths:
+
+```yaml
+models:
+  base_model_path: "./models/Baichuan2-7B-Base"
+  lora_adapter_path: "./models/lora_adapter"
+  dpo_model_path: "./models/dpo_model"
+
+data:
+  lora_output_path: "./data/processed/lora_data.json"
+  dpo_output_path: "./data/processed/dpo_data.json"
 ```
 
-### 4. 模型训练
+## CLI Usage
+
+Show available commands:
 
 ```bash
-# LoRA微调
-python -m src.cli.main train-lora
-
-# DPO优化
-python -m src.cli.main train-dpo
+python -m src.cli.main --help
 ```
 
-### 5. RAG设置
+Run LoRA fine-tuning:
 
 ```bash
-# 构建向量数据库
+python -m src.cli.main train-lora \
+  --config config.yaml \
+  --data-path ./data/processed/lora_data.json
+```
+
+Expected SFT data format:
+
+```json
+[
+  {
+    "instruction": "请解释企业流动资金贷款的适用场景。",
+    "input": "",
+    "output": "企业流动资金贷款主要用于..."
+  }
+]
+```
+
+Run DPO optimization:
+
+```bash
+python -m src.cli.main train-dpo \
+  --config config.yaml \
+  --data-path ./data/processed/dpo_data.json
+```
+
+Expected DPO data format:
+
+```json
+[
+  {
+    "prompt": "客户想了解企业贷款准入条件，应如何回答？",
+    "chosen": "可以从企业资质、经营流水、征信和担保方式等方面说明...",
+    "rejected": "企业贷款就是给企业的钱，满足条件就能申请。"
+  }
+]
+```
+
+Declared but not fully implemented yet:
+
+```bash
+python -m src.cli.main process-data --config config.yaml
 python -m src.cli.main setup-rag
-
-# 微调嵌入模型
-python -m src.cli.main finetune-embedding
-
-# 微调重排序模型
-python -m src.cli.main finetune-rerank
+python -m src.cli.main inference
 ```
 
-### 6. 推理测试
+`setup-rag` and `inference` currently raise `NotImplementedError`. `process-data` requires adding `src/data/processor.py`.
 
-```bash
-# 启动问答系统
-python -m src.cli.main inference --query "什么是企业贷款？"
-```
+## Development Notes
 
-## 主要功能
+- Keep large datasets, model weights, vector databases and logs out of Git.
+- Keep API keys out of `config.yaml`; use environment variables or a local ignored config when integrating external services.
+- Add or update README commands whenever a CLI command moves from placeholder to implemented.
+- Prefer small sample JSON files for local smoke tests before running full model training.
 
-### 数据处理流程
+## License
 
-1. **数据加载**: 从Hugging Face加载DISC-FIN-SFT数据集
-2. **质量过滤**: 使用困惑度分数过滤低质量数据
-3. **提示转换**: 应用模板转换问题格式
-4. **风格优化**: 使用GPT-4生成产品经理风格答案
-
-### 训练流程
-
-1. **LoRA微调**: 在银行问答数据上微调Baichuan2模型
-2. **DPO优化**: 使用成对数据优化模型输出风格
-
-### RAG系统
-
-1. **知识分块**: 将问答对分块为可检索片段
-2. **向量嵌入**: 使用BGE-M3生成文本嵌入
-3. **向量检索**: FAISS快速相似度搜索
-4. **结果重排序**: BGE-M3重排序模型优化结果
-5. **自适应检索**: 根据查询复杂度动态调整检索策略
-
-### 推理引擎
-
-1. **查询处理**: 接收用户查询
-2. **上下文检索**: RAG系统检索相关知识
-3. **答案生成**: 微调模型生成专业答案
-4. **日志记录**: 记录查询和响应用于评估
-
-## 配置说明
-
-### 数据配置
-
-- `dataset_id`: Hugging Face数据集ID
-- `filter_banking`: 是否过滤银行相关数据
-- `perplexity_threshold`: 困惑度过滤阈值
-
-### 模型配置
-
-- `base_model_path`: Baichuan2基础模型路径
-- `embedding_model_path`: BGE-M3嵌入模型路径
-- `rerank_model_path`: BGE-M3重排序模型路径
-
-### 训练配置
-
-- **LoRA**: rank, alpha, dropout, learning_rate, batch_size, epochs
-- **DPO**: beta, learning_rate, batch_size, epochs
-
-### RAG配置
-
-- `chunk_max_tokens`: 每个块的最大令牌数
-- `retrieval_top_k`: 检索的top-k块数
-- `rerank_top_n`: 重排序后保留的top-n块数
-
-## 性能指标
-
-- **TruLen分数**: 企业产品知识准确性评估
-- **检索延迟**: 目标 <500ms
-- **基线对比**: 目标超越67.2的基线分数
-
-
+This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE).
