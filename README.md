@@ -1,4 +1,4 @@
-# Banking RAG
+# 银行业 RAG 问答实验项目
 
 面向银行业务问答场景的 RAG 与模型微调实验项目。仓库目前聚焦三件事：
 
@@ -8,22 +8,22 @@
 
 > 当前代码仍处于实验/搭建阶段。`train-lora` 和 `train-dpo` 已有实现；`setup-rag` 与 `inference` 是预留命令；`process-data` 入口已声明，但依赖的 `src.data.processor` 模块尚未提交到仓库。
 
-## Features
+## 功能概览
 
-### Implemented
+### 已实现
 
 - `ConfigManager`: 支持 YAML / JSON 配置加载、必填项校验、默认值补齐和点号路径读取。
 - `Logger`: 统一控制台与文件日志输出。
 - `LoRATrainer`: 基于 `transformers`、`datasets`、`peft` 的因果语言模型 LoRA 微调流程。
 - `DPOOptimizer`: 基于 `trl` 的 DPO 偏好优化流程，兼容不同版本 `DPOTrainer` 的 `tokenizer` / `processing_class` 参数。
-- CLI:
+- 命令行入口：
   - `train-lora`
   - `train-dpo`
   - `process-data`（入口存在，数据处理模块待补齐）
   - `setup-rag`（预留）
   - `inference`（预留）
 
-### Planned
+### 规划中
 
 - 银行业数据抽取、清洗、过滤与 SFT / DPO 数据构造
 - BGE-M3 embedding 与 reranker 微调
@@ -32,7 +32,7 @@
 - 银行业问答推理链路
 - 评估指标与回归测试
 
-## Project Structure
+## 项目结构
 
 ```text
 Banking_RAG/
@@ -64,9 +64,9 @@ models/
 logs/
 ```
 
-## Requirements
+## 环境要求
 
-- Python 3.10+ recommended
+- 推荐 Python 3.10+
 - PyTorch 2.x
 - `transformers`
 - `datasets`
@@ -76,7 +76,7 @@ logs/
 - `faiss-cpu`
 - `sentence-transformers`
 
-Install dependencies:
+安装依赖：
 
 ```bash
 python -m venv .venv
@@ -84,24 +84,24 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-If you train large language models locally, prepare a CUDA-capable environment and place the base model files under the paths configured in `config.yaml`.
+如果需要在本地训练大模型，请准备可用的 CUDA 环境，并将基础模型文件放到 `config.yaml` 中配置的路径下。
 
-## Configuration
+## 配置说明
 
-The default config is [config.yaml](config.yaml). Key sections:
+默认配置文件是 [config.yaml](config.yaml)。主要配置项如下：
 
-| Section | Purpose |
+| 配置段 | 作用 |
 | --- | --- |
-| `data` | Dataset id, banking filter switch, output paths for SFT and DPO data |
-| `models` | Base model, embedding model, reranker, LoRA adapter and DPO output paths |
-| `lora` | LoRA rank, alpha, dropout, learning rate, batch size and training steps |
-| `dpo` | DPO beta, learning rate, batch size and training steps |
-| `rag` | Chunk size, retrieval top-k, rerank top-n and vector DB path |
-| `inference` | Generation temperature, max tokens, top-p and repetition penalty |
-| `logging` | Log level, console/file output and log file path |
-| `evaluation` | Test data path and baseline score placeholder |
+| `data` | 数据集 ID、银行数据过滤开关、SFT 与 DPO 数据输出路径 |
+| `models` | 基础模型、嵌入模型、重排序模型、LoRA 适配器与 DPO 模型输出路径 |
+| `lora` | LoRA rank、alpha、dropout、学习率、批次大小和训练步数 |
+| `dpo` | DPO beta、学习率、批次大小和训练步数 |
+| `rag` | 分块大小、检索 top-k、重排序 top-n 和向量库路径 |
+| `inference` | 生成温度、最大 token 数、top-p 和重复惩罚 |
+| `logging` | 日志级别、控制台/文件输出开关和日志文件路径 |
+| `evaluation` | 测试集路径和基线分数占位配置 |
 
-Before training, update at least these paths:
+训练前至少需要确认这些路径：
 
 ```yaml
 models:
@@ -114,15 +114,15 @@ data:
   dpo_output_path: "./data/processed/dpo_data.json"
 ```
 
-## CLI Usage
+## 命令行用法
 
-Show available commands:
+查看可用命令：
 
 ```bash
 python -m src.cli.main --help
 ```
 
-Run LoRA fine-tuning:
+运行 LoRA 微调：
 
 ```bash
 python -m src.cli.main train-lora \
@@ -130,7 +130,7 @@ python -m src.cli.main train-lora \
   --data-path ./data/processed/lora_data.json
 ```
 
-Expected SFT data format:
+SFT 数据格式示例：
 
 ```json
 [
@@ -142,7 +142,7 @@ Expected SFT data format:
 ]
 ```
 
-Run DPO optimization:
+运行 DPO 偏好优化：
 
 ```bash
 python -m src.cli.main train-dpo \
@@ -150,7 +150,7 @@ python -m src.cli.main train-dpo \
   --data-path ./data/processed/dpo_data.json
 ```
 
-Expected DPO data format:
+DPO 数据格式示例：
 
 ```json
 [
@@ -162,7 +162,7 @@ Expected DPO data format:
 ]
 ```
 
-Declared but not fully implemented yet:
+以下命令已声明，但尚未完整实现：
 
 ```bash
 python -m src.cli.main process-data --config config.yaml
@@ -170,15 +170,15 @@ python -m src.cli.main setup-rag
 python -m src.cli.main inference
 ```
 
-`setup-rag` and `inference` currently raise `NotImplementedError`. `process-data` requires adding `src/data/processor.py`.
+`setup-rag` 和 `inference` 当前会抛出 `NotImplementedError`。`process-data` 需要先补充 `src/data/processor.py`。
 
-## Development Notes
+## 开发说明
 
-- Keep large datasets, model weights, vector databases and logs out of Git.
-- Keep API keys out of `config.yaml`; use environment variables or a local ignored config when integrating external services.
-- Add or update README commands whenever a CLI command moves from placeholder to implemented.
-- Prefer small sample JSON files for local smoke tests before running full model training.
+- 大型数据集、模型权重、向量数据库和日志文件不要提交到 Git。
+- API key 不要写入 `config.yaml`；接入外部服务时建议使用环境变量或本地忽略的配置文件。
+- 当某个 CLI 命令从预留状态变为已实现状态时，同步更新 README。
+- 运行完整模型训练前，优先用小型 JSON 样例做本地冒烟测试。
 
-## License
+## 许可证
 
-This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE).
+本项目使用 Apache License 2.0，详见 [LICENSE](LICENSE)。
