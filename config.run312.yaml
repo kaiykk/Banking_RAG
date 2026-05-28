@@ -45,10 +45,15 @@ dpo:
 rag:
   chunk_max_tokens: 512  # 每个块的最大令牌数
   chunk_overlap: 50  # 块之间的重叠令牌数
+  chunk_max_chars: 1200  # 最小RAG实现使用的字符级切块长度
+  chunk_overlap_chars: 120  # 最小RAG实现使用的字符级重叠长度
   retrieval_top_k: 10  # 检索的top-k块数
   rerank_top_n: 5  # 重排序后保留的top-n块数
   context_template: "参考信息：\n{context}\n\n问题：{question}\n答案："  # 上下文模板
   vector_db_path: "./data/vector_db"  # 向量数据库保存路径
+  index_file: "index.faiss"  # FAISS索引文件名
+  chunks_file: "chunks.json"  # 文本块元数据文件名
+  source_paths: []  # 知识源路径，支持txt/md/json/jsonl文件或目录
   
   # 自适应检索参数
   adaptive:
@@ -62,6 +67,8 @@ inference:
   max_tokens: 512  # 最大生成令牌数
   top_p: 0.9  # Top-p采样
   repetition_penalty: 1.1  # 重复惩罚
+  use_generation: false  # 默认只返回检索上下文，传入--generate后再调用本地模型
+  model_path: ""  # 可选：覆盖默认DPO模型路径
 
 # GPT-4 API配置（用于风格优化）
 gpt4:

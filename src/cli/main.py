@@ -34,8 +34,30 @@ def build_parser() -> argparse.ArgumentParser:
         help="Override DPO pairwise data path (JSON)",
     )
 
-    subparsers.add_parser("setup-rag", help="Placeholder for RAG setup")
-    subparsers.add_parser("inference", help="Placeholder for inference")
+    rag_parser = subparsers.add_parser("setup-rag", help="Build local RAG vector index")
+    rag_parser.add_argument("--config", default="config.yaml", help="Path to config file")
+    rag_parser.add_argument(
+        "--documents",
+        nargs="+",
+        default=None,
+        help="Override knowledge source paths configured in rag.source_paths",
+    )
+    rag_parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="Remove existing vector index files before rebuilding",
+    )
+
+    inference_parser = subparsers.add_parser("inference", help="Run RAG retrieval/inference")
+    inference_parser.add_argument("--config", default="config.yaml", help="Path to config file")
+    inference_parser.add_argument("--query", required=True, help="User question")
+    inference_parser.add_argument("--top-k", type=int, default=None, help="Override retrieval top-k")
+    inference_parser.add_argument(
+        "--generate",
+        action="store_true",
+        default=None,
+        help="Use the configured local generation model after retrieval",
+    )
     return parser
 
 
@@ -68,6 +90,22 @@ def main() -> None:
 
         optimizer = DPOOptimizer(config_path=args.config)
         summary = optimizer.train_with_preferences(pairwise_data_path=args.data_path)
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        return
+
+    if args.command == "setup-rag":
+        from src.rag import RAGIndexer
+
+        indexer = RAGIndexer(config_path=args.config)
+        summary = indexer.build(source_paths=args.documents, reset=args.reset)
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        return
+
+    if args.command == "inference":
+        from src.inference import InferenceEngine
+
+        engine = InferenceEngine(config_path=args.config)
+        summary = engine.answer(query=args.query, top_k=args.top_k, generate=args.generate)
         print(json.dumps(summary, ensure_ascii=False, indent=2))
         return
 

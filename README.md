@@ -16,20 +16,23 @@
 - `Logger`: 统一控制台与文件日志输出。
 - `LoRATrainer`: 基于 `transformers`、`datasets`、`peft` 的因果语言模型 LoRA 微调流程。
 - `DPOOptimizer`: 基于 `trl` 的 DPO 偏好优化流程，兼容不同版本 `DPOTrainer` 的 `tokenizer` / `processing_class` 参数。
+- `RAGIndexer`: 支持从 txt、md、json、jsonl 或目录读取知识源，完成文本切块、embedding 和 FAISS 建库。
+- `RAGRetriever`: 加载本地 FAISS 索引并返回相关文本块。
+- `InferenceEngine`: 执行检索、上下文拼接，并可选调用本地生成模型。
 - 命令行入口：
   - `train-lora`
   - `train-dpo`
   - `process-data`（入口存在，数据处理模块待补齐）
-  - `setup-rag`（预留）
-  - `inference`（预留）
+  - `setup-rag`
+  - `inference`
 
 ### 规划中
 
 - 银行业数据抽取、清洗、过滤与 SFT / DPO 数据构造
 - BGE-M3 embedding 与 reranker 微调
-- FAISS 向量库构建
+- 重排序模型接入
 - 自适应检索策略
-- 银行业问答推理链路
+- 生成模型加载策略优化
 - 评估指标与回归测试
 
 ## 项目结构
@@ -44,6 +47,10 @@ Banking_RAG/
 │   ├── logger.py            # 日志封装
 │   ├── cli/
 │   │   └── main.py          # 命令行入口
+│   ├── inference/
+│   │   └── engine.py        # 检索增强推理编排
+│   ├── rag/
+│   │   └── pipeline.py      # 文档读取、切块、建库与检索
 │   └── training/
 │       ├── lora_trainer.py  # LoRA SFT 训练
 │       └── dpo_optimizer.py # DPO 偏好优化
@@ -96,8 +103,8 @@ pip install -r requirements.txt
 | `models` | 基础模型、嵌入模型、重排序模型、LoRA 适配器与 DPO 模型输出路径 |
 | `lora` | LoRA rank、alpha、dropout、学习率、批次大小和训练步数 |
 | `dpo` | DPO beta、学习率、批次大小和训练步数 |
-| `rag` | 分块大小、检索 top-k、重排序 top-n 和向量库路径 |
-| `inference` | 生成温度、最大 token 数、top-p 和重复惩罚 |
+| `rag` | 知识源路径、分块大小、检索 top-k、索引文件和向量库路径 |
+| `inference` | 是否启用生成模型、模型路径、生成温度、最大 token 数、top-p 和重复惩罚 |
 | `logging` | 日志级别、控制台/文件输出开关和日志文件路径 |
 | `evaluation` | 测试集路径和基线分数占位配置 |
 
@@ -112,6 +119,10 @@ models:
 data:
   lora_output_path: "./data/processed/lora_data.json"
   dpo_output_path: "./data/processed/dpo_data.json"
+
+rag:
+  source_paths:
+    - "./data/processed/knowledge.jsonl"
 ```
 
 ## 命令行用法
@@ -162,15 +173,43 @@ DPO 数据格式示例：
 ]
 ```
 
-以下命令已声明，但尚未完整实现：
+构建 RAG 向量索引：
+
+```bash
+python -m src.cli.main setup-rag \
+  --config config.yaml \
+  --documents ./data/processed/knowledge.jsonl \
+  --reset
+```
+
+知识源支持 `.txt`、`.md`、`.json`、`.jsonl` 文件，也支持目录。JSON / JSONL 会优先抽取 `text`、`content`、`question`、`answer`、`instruction`、`output`、`prompt`、`chosen` 等字段。
+
+执行检索增强推理：
+
+```bash
+python -m src.cli.main inference \
+  --config config.yaml \
+  --query "企业流动资金贷款适合什么场景？" \
+  --top-k 5
+```
+
+默认情况下，`inference` 只返回检索上下文和拼好的 prompt，不调用本地大模型。若已经准备好生成模型，可在配置中设置 `inference.model_path`，或使用默认 `models.dpo_model_path`，然后添加 `--generate`：
+
+```bash
+python -m src.cli.main inference \
+  --config config.yaml \
+  --query "企业流动资金贷款适合什么场景？" \
+  --top-k 5 \
+  --generate
+```
+
+以下命令已声明，但数据处理模块尚未补齐：
 
 ```bash
 python -m src.cli.main process-data --config config.yaml
-python -m src.cli.main setup-rag
-python -m src.cli.main inference
 ```
 
-`setup-rag` 和 `inference` 当前会抛出 `NotImplementedError`。`process-data` 需要先补充 `src/data/processor.py`。
+`process-data` 需要先补充 `src/data/processor.py`。数据清洗、样例数据和测试会在拿到真实数据后继续完善。
 
 ## 开发说明
 
