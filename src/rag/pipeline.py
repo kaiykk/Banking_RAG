@@ -3,7 +3,7 @@
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 import numpy as np
 
@@ -36,6 +36,13 @@ class RetrievalResult:
 
     chunk: Chunk
     score: float
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a JSON-serializable representation."""
+        return {
+            "score": self.score,
+            "chunk": asdict(self.chunk),
+        }
 
 
 class DocumentLoader:
@@ -192,7 +199,7 @@ class TextChunker:
 class EmbeddingModel:
     """SentenceTransformer wrapper with normalized embeddings."""
 
-    def __init__(self, model_path: str) -> None:
+    def __init__(self, model_path: str, batch_size: int = 32) -> None:
         try:
             from sentence_transformers import SentenceTransformer
         except ImportError as exc:
@@ -200,11 +207,14 @@ class EmbeddingModel:
                 "缺少 sentence-transformers。请先执行: pip install sentence-transformers"
             ) from exc
 
+        self.model_path = model_path
+        self.batch_size = batch_size
         self.model = SentenceTransformer(model_path)
 
     def encode(self, texts: Sequence[str]) -> np.ndarray:
         vectors = self.model.encode(
             list(texts),
+            batch_size=self.batch_size,
             convert_to_numpy=True,
             normalize_embeddings=True,
             show_progress_bar=False,
@@ -238,6 +248,7 @@ class RAGIndexer:
         vector_db_path = Path(self.rag_cfg.get("vector_db_path", "./data/vector_db"))
         index_path = vector_db_path / self.rag_cfg.get("index_file", "index.faiss")
         chunks_path = vector_db_path / self.rag_cfg.get("chunks_file", "chunks.json")
+        manifest_path = vector_db_path / self.rag_cfg.get("manifest_file", "manifest.json")
         if reset and vector_db_path.exists():
             for child in vector_db_path.iterdir():
                 if child.is_file():
@@ -253,7 +264,11 @@ class RAGIndexer:
         if not chunks:
             raise ValueError("没有可索引的文本块。")
 
-        embedding_model = EmbeddingModel(self.models_cfg.get("embedding_model_path", "BAAI/bge-m3"))
+        embedding_model_path = self.models_cfg.get("embedding_model_path", "BAAI/bge-m3")
+        embedding_model = EmbeddingModel(
+            embedding_model_path,
+            batch_size=int(self.rag_cfg.get("embedding_batch_size", 32)),
+        )
         vectors = embedding_model.encode([chunk.text for chunk in chunks])
 
         index = faiss.IndexFlatIP(vectors.shape[1])
@@ -263,6 +278,19 @@ class RAGIndexer:
             json.dumps([asdict(chunk) for chunk in chunks], ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+        manifest = {
+            "documents": len(documents),
+            "chunks": len(chunks),
+            "embedding_model_path": embedding_model_path,
+            "embedding_dimension": int(vectors.shape[1]),
+            "source_paths": paths,
+            "index_file": index_path.name,
+            "chunks_file": chunks_path.name,
+        }
+        manifest_path.write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
 
         self.logger.info("RAG index saved to %s with %d chunks.", index_path, len(chunks))
         return {
@@ -270,6 +298,7 @@ class RAGIndexer:
             "chunks": len(chunks),
             "index_path": str(index_path),
             "chunks_path": str(chunks_path),
+            "manifest_path": str(manifest_path),
         }
 
 
@@ -291,6 +320,8 @@ class RAGRetriever:
         self._ensure_loaded()
 
         k = int(top_k or self.rag_cfg.get("retrieval_top_k", 10))
+        if k <= 0:
+            raise ValueError("top_k 必须大于 0。")
         k = min(k, len(self._chunks))
         query_vector = self._embedding_model.encode([query])
         scores, indices = self._index.search(query_vector, k)
@@ -300,6 +331,27 @@ class RAGRetriever:
                 continue
             results.append(RetrievalResult(chunk=self._chunks[int(index)], score=float(score)))
         return results
+
+    def retrieve_as_dicts(self, query: str, top_k: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Retrieve and return JSON-serializable result dictionaries."""
+        return [result.to_dict() for result in self.retrieve(query=query, top_k=top_k)]
+
+    def status(self) -> Dict[str, Any]:
+        """Return persisted index status without loading the embedding model."""
+        vector_db_path = Path(self.rag_cfg.get("vector_db_path", "./data/vector_db"))
+        index_path = vector_db_path / self.rag_cfg.get("index_file", "index.faiss")
+        chunks_path = vector_db_path / self.rag_cfg.get("chunks_file", "chunks.json")
+        manifest_path = vector_db_path / self.rag_cfg.get("manifest_file", "manifest.json")
+        manifest: Dict[str, Any] = {}
+        if manifest_path.exists():
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        return {
+            "ready": index_path.exists() and chunks_path.exists(),
+            "index_path": str(index_path),
+            "chunks_path": str(chunks_path),
+            "manifest_path": str(manifest_path),
+            "manifest": manifest,
+        }
 
     def _ensure_loaded(self) -> None:
         if self._index is not None:
@@ -321,5 +373,6 @@ class RAGRetriever:
         raw_chunks = json.loads(chunks_path.read_text(encoding="utf-8"))
         self._chunks = [Chunk(**item) for item in raw_chunks]
         self._embedding_model = EmbeddingModel(
-            self.models_cfg.get("embedding_model_path", "BAAI/bge-m3")
+            self.models_cfg.get("embedding_model_path", "BAAI/bge-m3"),
+            batch_size=int(self.rag_cfg.get("embedding_batch_size", 32)),
         )

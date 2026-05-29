@@ -17,13 +17,14 @@
 - `LoRATrainer`: 基于 `transformers`、`datasets`、`peft` 的因果语言模型 LoRA 微调流程。
 - `DPOOptimizer`: 基于 `trl` 的 DPO 偏好优化流程，兼容不同版本 `DPOTrainer` 的 `tokenizer` / `processing_class` 参数。
 - `RAGIndexer`: 支持从 txt、md、json、jsonl 或目录读取知识源，完成文本切块、embedding 和 FAISS 建库。
-- `RAGRetriever`: 加载本地 FAISS 索引并返回相关文本块。
+- `RAGRetriever`: 加载本地 FAISS 索引并返回相关文本块，支持独立检索和索引状态查看。
 - `InferenceEngine`: 执行检索、上下文拼接，并可选调用本地生成模型。
 - 命令行入口：
   - `train-lora`
   - `train-dpo`
   - `process-data`（入口存在，数据处理模块待补齐）
   - `setup-rag`
+  - `query-rag`
   - `inference`
 
 ### 规划中
@@ -183,6 +184,18 @@ python -m src.cli.main setup-rag \
 ```
 
 知识源支持 `.txt`、`.md`、`.json`、`.jsonl` 文件，也支持目录。JSON / JSONL 会优先抽取 `text`、`content`、`question`、`answer`、`instruction`、`output`、`prompt`、`chosen` 等字段。
+
+直接查询本地 RAG 索引：
+
+```bash
+python -m src.cli.main query-rag \
+  --config config.yaml \
+  --query "企业流动资金贷款适合什么场景？" \
+  --top-k 5 \
+  --status
+```
+
+`query-rag` 会返回命中的文本块、相似度分数、来源文件和索引状态，适合在接入生成模型前先检查检索质量。
 
 执行检索增强推理：
 

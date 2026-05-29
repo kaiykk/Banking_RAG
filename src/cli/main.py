@@ -48,6 +48,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Remove existing vector index files before rebuilding",
     )
 
+    query_rag_parser = subparsers.add_parser("query-rag", help="Query the local RAG index")
+    query_rag_parser.add_argument("--config", default="config.yaml", help="Path to config file")
+    query_rag_parser.add_argument("--query", required=True, help="Search query")
+    query_rag_parser.add_argument("--top-k", type=int, default=None, help="Override retrieval top-k")
+    query_rag_parser.add_argument(
+        "--status",
+        action="store_true",
+        help="Print index status before running retrieval",
+    )
+
     inference_parser = subparsers.add_parser("inference", help="Run RAG retrieval/inference")
     inference_parser.add_argument("--config", default="config.yaml", help="Path to config file")
     inference_parser.add_argument("--query", required=True, help="User question")
@@ -99,6 +109,16 @@ def main() -> None:
         indexer = RAGIndexer(config_path=args.config)
         summary = indexer.build(source_paths=args.documents, reset=args.reset)
         print(json.dumps(summary, ensure_ascii=False, indent=2))
+        return
+
+    if args.command == "query-rag":
+        from src.rag import RAGRetriever
+
+        retriever = RAGRetriever(config_path=args.config)
+        payload = {"results": retriever.retrieve_as_dicts(query=args.query, top_k=args.top_k)}
+        if args.status:
+            payload["status"] = retriever.status()
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
         return
 
     if args.command == "inference":

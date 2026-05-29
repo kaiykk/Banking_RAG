@@ -53,6 +53,8 @@ rag:
   vector_db_path: "./data/vector_db"  # 向量数据库保存路径
   index_file: "index.faiss"  # FAISS索引文件名
   chunks_file: "chunks.json"  # 文本块元数据文件名
+  manifest_file: "manifest.json"  # 索引构建摘要文件名
+  embedding_batch_size: 32  # embedding批处理大小
   source_paths: []  # 知识源路径，支持txt/md/json/jsonl文件或目录
   
   # 自适应检索参数
