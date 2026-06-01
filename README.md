@@ -16,8 +16,8 @@
 - `Logger`: 统一控制台与文件日志输出。
 - `LoRATrainer`: 基于 `transformers`、`datasets`、`peft` 的因果语言模型 LoRA 微调流程。
 - `DPOOptimizer`: 基于 `trl` 的 DPO 偏好优化流程，兼容不同版本 `DPOTrainer` 的 `tokenizer` / `processing_class` 参数。
-- `RAGIndexer`: 支持从 txt、md、json、jsonl 或目录读取知识源，完成文本切块、embedding 和 FAISS 建库。
-- `RAGRetriever`: 加载本地 FAISS 索引并返回相关文本块，支持独立检索和索引状态查看。
+- `RAGIndexer`: 支持从 txt、md、json、jsonl 或目录读取知识源，按段落/句子边界切块，完成 embedding 和 FAISS 建库。
+- `RAGRetriever`: 加载本地 FAISS 索引并返回相关文本块，支持相似度检索、MMR 去重检索和索引状态查看。
 - `InferenceEngine`: 执行检索、上下文拼接，并可选调用本地生成模型。
 - 命令行入口：
   - `train-lora`
@@ -104,7 +104,7 @@ pip install -r requirements.txt
 | `models` | 基础模型、嵌入模型、重排序模型、LoRA 适配器与 DPO 模型输出路径 |
 | `lora` | LoRA rank、alpha、dropout、学习率、批次大小和训练步数 |
 | `dpo` | DPO beta、学习率、批次大小和训练步数 |
-| `rag` | 知识源路径、分块大小、检索 top-k、索引文件和向量库路径 |
+| `rag` | 知识源路径、分块大小、检索 top-k、MMR 参数、索引文件和向量库路径 |
 | `inference` | 是否启用生成模型、模型路径、生成温度、最大 token 数、top-p 和重复惩罚 |
 | `logging` | 日志级别、控制台/文件输出开关和日志文件路径 |
 | `evaluation` | 测试集路径和基线分数占位配置 |

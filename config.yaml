@@ -48,6 +48,9 @@ rag:
   chunk_max_chars: 1200  # 最小RAG实现使用的字符级切块长度
   chunk_overlap_chars: 120  # 最小RAG实现使用的字符级重叠长度
   retrieval_top_k: 10  # 检索的top-k块数
+  retrieval_strategy: "mmr"  # 检索策略：similarity 或 mmr
+  retrieval_fetch_k: 40  # MMR候选池大小
+  mmr_lambda: 0.7  # MMR相关性权重，越高越偏向相似度
   rerank_top_n: 5  # 重排序后保留的top-n块数
   context_template: "参考信息：\n{context}\n\n问题：{question}\n答案："  # 上下文模板
   vector_db_path: "./data/vector_db"  # 向量数据库保存路径

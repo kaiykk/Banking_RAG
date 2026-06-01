@@ -1,6 +1,8 @@
 """Minimal RAG indexing and retrieval pipeline."""
 
 import json
+import re
+from datetime import datetime, timezone
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
@@ -151,7 +153,7 @@ class DocumentLoader:
 
 
 class TextChunker:
-    """Split documents into overlapping character chunks."""
+    """Split documents into overlapping chunks with boundary awareness."""
 
     def __init__(self, max_chars: int = 1200, overlap_chars: int = 120) -> None:
         if max_chars <= 0:
@@ -167,10 +169,8 @@ class TextChunker:
         chunks: List[Chunk] = []
         for doc_index, document in enumerate(documents):
             text = self._normalize_text(document.text)
-            start = 0
-            chunk_index = 0
-            while start < len(text):
-                end = min(start + self.max_chars, len(text))
+            spans = self._build_spans(text)
+            for chunk_index, (start, end) in enumerate(spans):
                 chunk_text = text[start:end].strip()
                 if chunk_text:
                     chunks.append(
@@ -182,18 +182,51 @@ class TextChunker:
                                 **document.metadata,
                                 "doc_index": doc_index,
                                 "chunk_index": chunk_index,
+                                "char_start": start,
+                                "char_end": end,
                             },
                         )
                     )
-                if end == len(text):
-                    break
-                start = max(0, end - self.overlap_chars)
-                chunk_index += 1
         return chunks
 
     @staticmethod
     def _normalize_text(text: str) -> str:
         return "\n".join(line.strip() for line in text.splitlines() if line.strip())
+
+    def _build_spans(self, text: str) -> List[tuple[int, int]]:
+        spans: List[tuple[int, int]] = []
+        start = 0
+        while start < len(text):
+            hard_end = min(start + self.max_chars, len(text))
+            end = self._find_boundary(text, start, hard_end)
+            if end <= start:
+                end = hard_end
+            spans.append((start, end))
+            if end == len(text):
+                break
+            start = max(0, end - self.overlap_chars)
+        return spans
+
+    @staticmethod
+    def _find_boundary(text: str, start: int, hard_end: int) -> int:
+        if hard_end == len(text):
+            return hard_end
+
+        window = text[start:hard_end]
+        boundary_patterns = [
+            r"\n{2,}",
+            r"[。！？!?]\s*",
+            r"[；;]\s*",
+            r"\n",
+        ]
+        min_end = max(0, int(len(window) * 0.6))
+        for pattern in boundary_patterns:
+            matches = list(re.finditer(pattern, window))
+            for match in reversed(matches):
+                candidate = match.end()
+                if candidate >= min_end:
+                    return start + candidate
+        return hard_end
 
 
 class EmbeddingModel:
@@ -279,6 +312,8 @@ class RAGIndexer:
             encoding="utf-8",
         )
         manifest = {
+            "schema_version": 1,
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "documents": len(documents),
             "chunks": len(chunks),
             "embedding_model_path": embedding_model_path,
@@ -286,6 +321,9 @@ class RAGIndexer:
             "source_paths": paths,
             "index_file": index_path.name,
             "chunks_file": chunks_path.name,
+            "retrieval_strategy": self.rag_cfg.get("retrieval_strategy", "similarity"),
+            "chunk_max_chars": int(self.rag_cfg.get("chunk_max_chars", 1200)),
+            "chunk_overlap_chars": int(self.rag_cfg.get("chunk_overlap_chars", 120)),
         }
         manifest_path.write_text(
             json.dumps(manifest, ensure_ascii=False, indent=2),
@@ -313,6 +351,7 @@ class RAGRetriever:
         self._index = None
         self._chunks: List[Chunk] = []
         self._embedding_model: Optional[EmbeddingModel] = None
+        self._chunk_vectors: Optional[np.ndarray] = None
 
     def retrieve(self, query: str, top_k: Optional[int] = None) -> List[RetrievalResult]:
         if not query.strip():
@@ -324,11 +363,27 @@ class RAGRetriever:
             raise ValueError("top_k 必须大于 0。")
         k = min(k, len(self._chunks))
         query_vector = self._embedding_model.encode([query])
-        scores, indices = self._index.search(query_vector, k)
+        strategy = self.rag_cfg.get("retrieval_strategy", "similarity")
+        fetch_k = self._resolve_fetch_k(k)
+        scores, indices = self._index.search(query_vector, fetch_k)
+        if strategy == "mmr":
+            selected = self._select_mmr(
+                candidate_indices=indices[0],
+                candidate_scores=scores[0],
+                query_vector=query_vector[0],
+                top_k=k,
+            )
+        elif strategy == "similarity":
+            selected = [
+                (int(index), float(score))
+                for score, index in zip(scores[0], indices[0])
+                if index >= 0
+            ][:k]
+        else:
+            raise ValueError("rag.retrieval_strategy 仅支持 similarity 或 mmr。")
+
         results: List[RetrievalResult] = []
-        for score, index in zip(scores[0], indices[0]):
-            if index < 0:
-                continue
+        for index, score in selected:
             results.append(RetrievalResult(chunk=self._chunks[int(index)], score=float(score)))
         return results
 
@@ -350,8 +405,60 @@ class RAGRetriever:
             "index_path": str(index_path),
             "chunks_path": str(chunks_path),
             "manifest_path": str(manifest_path),
+            "retrieval_strategy": self.rag_cfg.get("retrieval_strategy", "similarity"),
             "manifest": manifest,
         }
+
+    def _resolve_fetch_k(self, top_k: int) -> int:
+        fetch_k = int(self.rag_cfg.get("retrieval_fetch_k", max(top_k * 4, top_k)))
+        return min(max(fetch_k, top_k), len(self._chunks))
+
+    def _select_mmr(
+        self,
+        candidate_indices: np.ndarray,
+        candidate_scores: np.ndarray,
+        query_vector: np.ndarray,
+        top_k: int,
+    ) -> List[tuple[int, float]]:
+        valid_candidates = [
+            (int(index), float(score))
+            for score, index in zip(candidate_scores, candidate_indices)
+            if index >= 0
+        ]
+        if not valid_candidates:
+            return []
+
+        lambda_mult = float(self.rag_cfg.get("mmr_lambda", 0.7))
+        lambda_mult = min(max(lambda_mult, 0.0), 1.0)
+        selected: List[tuple[int, float]] = []
+        selected_indices: List[int] = []
+        remaining = valid_candidates.copy()
+
+        while remaining and len(selected) < top_k:
+            best_item: Optional[tuple[int, float]] = None
+            best_value = -float("inf")
+            for index, score in remaining:
+                diversity_penalty = self._max_similarity_to_selected(index, selected_indices)
+                mmr_score = lambda_mult * score - (1.0 - lambda_mult) * diversity_penalty
+                if mmr_score > best_value:
+                    best_value = mmr_score
+                    best_item = (index, score)
+            if best_item is None:
+                break
+            selected.append(best_item)
+            selected_indices.append(best_item[0])
+            remaining = [item for item in remaining if item[0] != best_item[0]]
+        return selected
+
+    def _max_similarity_to_selected(self, index: int, selected_indices: Sequence[int]) -> float:
+        if not selected_indices:
+            return 0.0
+        if self._chunk_vectors is None:
+            raise RuntimeError("chunk vectors are not loaded")
+        vector = self._chunk_vectors[index]
+        selected_vectors = self._chunk_vectors[list(selected_indices)]
+        similarities = selected_vectors @ vector
+        return float(np.max(similarities))
 
     def _ensure_loaded(self) -> None:
         if self._index is not None:
@@ -372,7 +479,14 @@ class RAGRetriever:
         self._index = faiss.read_index(str(index_path))
         raw_chunks = json.loads(chunks_path.read_text(encoding="utf-8"))
         self._chunks = [Chunk(**item) for item in raw_chunks]
+        self._chunk_vectors = self._reconstruct_vectors()
         self._embedding_model = EmbeddingModel(
             self.models_cfg.get("embedding_model_path", "BAAI/bge-m3"),
             batch_size=int(self.rag_cfg.get("embedding_batch_size", 32)),
         )
+
+    def _reconstruct_vectors(self) -> np.ndarray:
+        vectors = np.vstack([self._index.reconstruct(i) for i in range(self._index.ntotal)])
+        norms = np.linalg.norm(vectors, axis=1, keepdims=True)
+        norms[norms == 0] = 1.0
+        return np.asarray(vectors / norms, dtype="float32")
