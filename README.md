@@ -18,7 +18,7 @@
 - `DPOOptimizer`: 基于 `trl` 的 DPO 偏好优化流程，兼容不同版本 `DPOTrainer` 的 `tokenizer` / `processing_class` 参数。
 - `RAGIndexer`: 支持从 txt、md、json、jsonl 或目录读取知识源，按段落/句子边界切块，完成 embedding 和 FAISS 建库。
 - `RAGRetriever`: 加载本地 FAISS 索引并返回相关文本块，支持相似度检索、MMR 去重检索和索引状态查看。
-- `InferenceEngine`: 执行检索、上下文拼接，并可选调用本地生成模型。
+- `InferenceEngine`: 执行检索、上下文拼接，可控制 prompt / sources 输出，并可选调用本地生成模型。
 - 命令行入口：
   - `train-lora`
   - `train-dpo`
@@ -105,7 +105,7 @@ pip install -r requirements.txt
 | `lora` | LoRA rank、alpha、dropout、学习率、批次大小和训练步数 |
 | `dpo` | DPO beta、学习率、批次大小和训练步数 |
 | `rag` | 知识源路径、分块大小、检索 top-k、MMR 参数、索引文件和向量库路径 |
-| `inference` | 是否启用生成模型、模型路径、生成温度、最大 token 数、top-p 和重复惩罚 |
+| `inference` | 是否启用生成模型、模型路径、输出字段、生成温度、最大 token 数、top-p 和重复惩罚 |
 | `logging` | 日志级别、控制台/文件输出开关和日志文件路径 |
 | `evaluation` | 测试集路径和基线分数占位配置 |
 
@@ -214,6 +214,17 @@ python -m src.cli.main inference \
   --query "企业流动资金贷款适合什么场景？" \
   --top-k 5 \
   --generate
+```
+
+如果只想拿最终回答和来源数量，可以隐藏 prompt 或来源文本：
+
+```bash
+python -m src.cli.main inference \
+  --config config.yaml \
+  --query "企业流动资金贷款适合什么场景？" \
+  --top-k 5 \
+  --no-prompt \
+  --no-sources
 ```
 
 以下命令已声明，但数据处理模块尚未补齐：

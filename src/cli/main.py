@@ -68,6 +68,16 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Use the configured local generation model after retrieval",
     )
+    inference_parser.add_argument(
+        "--no-prompt",
+        action="store_true",
+        help="Do not include the assembled prompt in JSON output",
+    )
+    inference_parser.add_argument(
+        "--no-sources",
+        action="store_true",
+        help="Do not include retrieved source chunks in JSON output",
+    )
     return parser
 
 
@@ -125,7 +135,13 @@ def main() -> None:
         from src.inference import InferenceEngine
 
         engine = InferenceEngine(config_path=args.config)
-        summary = engine.answer(query=args.query, top_k=args.top_k, generate=args.generate)
+        summary = engine.answer(
+            query=args.query,
+            top_k=args.top_k,
+            generate=args.generate,
+            include_prompt=False if args.no_prompt else None,
+            include_sources=False if args.no_sources else None,
+        )
         print(json.dumps(summary, ensure_ascii=False, indent=2))
         return
 

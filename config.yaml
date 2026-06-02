@@ -74,6 +74,10 @@ inference:
   repetition_penalty: 1.1  # 重复惩罚
   use_generation: false  # 默认只返回检索上下文，传入--generate后再调用本地模型
   model_path: ""  # 可选：覆盖默认DPO模型路径
+  include_prompt: true  # 输出中是否包含拼接后的prompt
+  include_sources: true  # 输出中是否包含检索来源文本块
+  torch_dtype: ""  # 可选：float16/bfloat16/float32
+  device_map: ""  # 可选：auto/cuda/cpu等transformers支持的device_map
 
 # GPT-4 API配置（用于风格优化）
 gpt4:
