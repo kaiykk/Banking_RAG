@@ -16,20 +16,23 @@
 - `Logger`: 统一控制台与文件日志输出。
 - `LoRATrainer`: 基于 `transformers`、`datasets`、`peft` 的因果语言模型 LoRA 微调流程。
 - `DPOOptimizer`: 基于 `trl` 的 DPO 偏好优化流程，兼容不同版本 `DPOTrainer` 的 `tokenizer` / `processing_class` 参数。
+- `DataProcessor`: 支持从 JSON、JSONL、CSV、TSV 或目录读取初始问答数据，输出 LoRA、DPO 和 RAG 知识源文件。
+- `ConfigValidator`: 检查核心配置、检索参数和关键路径，并输出结构化错误/提醒。
 - `RAGIndexer`: 支持从 txt、md、json、jsonl 或目录读取知识源，按段落/句子边界切块，完成 embedding 和 FAISS 建库。
 - `RAGRetriever`: 加载本地 FAISS 索引并返回相关文本块，支持相似度检索、MMR 去重检索和索引状态查看。
 - `InferenceEngine`: 执行检索、上下文拼接，可控制 prompt / sources 输出，并可选调用本地生成模型。
 - 命令行入口：
+  - `validate-config`
   - `train-lora`
   - `train-dpo`
-  - `process-data`（入口存在，数据处理模块待补齐）
+  - `process-data`
   - `setup-rag`
   - `query-rag`
   - `inference`
 
 ### 规划中
 
-- 银行业数据抽取、清洗、过滤与 SFT / DPO 数据构造
+- 更细粒度的银行字段映射和数据质量规则
 - BGE-M3 embedding 与 reranker 微调
 - 重排序模型接入
 - 自适应检索策略
@@ -133,6 +136,26 @@ rag:
 ```bash
 python -m src.cli.main --help
 ```
+
+校验配置：
+
+```bash
+python -m src.cli.main validate-config --config config.yaml
+```
+
+处理本地问答数据：
+
+```bash
+python -m src.cli.main process-data \
+  --config config.yaml \
+  --max-samples 100
+```
+
+`process-data` 会读取 `data.input_paths` 中的 JSON、JSONL、CSV、TSV 文件或目录，自动识别常见问题/答案字段，并输出：
+
+- `data.lora_output_path`
+- `data.dpo_output_path`
+- `data.knowledge_output_path`
 
 运行 LoRA 微调：
 

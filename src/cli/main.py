@@ -8,6 +8,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Banking RAG QA System CLI")
     subparsers = parser.add_subparsers(dest="command")
 
+    validate_parser = subparsers.add_parser("validate-config", help="Validate project config")
+    validate_parser.add_argument("--config", default="config.yaml", help="Path to config file")
+
     process_parser = subparsers.add_parser("process-data", help="Run data processing pipeline")
     process_parser.add_argument("--config", default="config.yaml", help="Path to config file")
     process_parser.add_argument("--split", default="train", help="Dataset split name")
@@ -87,6 +90,13 @@ def main() -> None:
 
     if not args.command:
         parser.print_help()
+        return
+
+    if args.command == "validate-config":
+        from src.validation import ConfigValidator
+
+        summary = ConfigValidator(config_path=args.config).validate()
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
         return
 
     if args.command == "process-data":

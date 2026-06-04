@@ -6,8 +6,10 @@ data:
   filter_banking: true  # 是否过滤银行相关数据
   perplexity_threshold: 100.0  # 困惑度阈值
   prompt_template: "问题：{question}\n答案："  # 提示模板
+  input_paths: []  # 原始数据路径，支持json/jsonl/csv/tsv文件或目录
   lora_output_path: "./data/processed/lora_data.json"  # LoRA训练数据输出路径
   dpo_output_path: "./data/processed/dpo_data.json"  # DPO训练数据输出路径
+  knowledge_output_path: "./data/processed/knowledge.jsonl"  # RAG知识源输出路径
 
 # 模型路径配置
 models:

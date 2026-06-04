@@ -37,8 +37,8 @@ logs/
 *.log
 
 # 数据和模型
-data/
-models/
+/data/
+/models/
 !models/.gitkeep
 *.bin
 *.safetensors
