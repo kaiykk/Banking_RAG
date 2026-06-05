@@ -19,7 +19,7 @@
 - `DataProcessor`: 支持从 JSON、JSONL、CSV、TSV 或目录读取初始问答数据，输出 LoRA、DPO 和 RAG 知识源文件。
 - `ConfigValidator`: 检查核心配置、检索参数和关键路径，并输出结构化错误/提醒。
 - `RAGIndexer`: 支持从 txt、md、json、jsonl 或目录读取知识源，按段落/句子边界切块，完成 embedding 和 FAISS 建库。
-- `RAGRetriever`: 加载本地 FAISS 索引并返回相关文本块，支持相似度检索、MMR 去重检索和索引状态查看。
+- `RAGRetriever`: 加载本地 FAISS 索引并返回相关文本块，支持相似度检索、MMR 去重检索、可选 rerank 和索引状态查看。
 - `InferenceEngine`: 执行检索、上下文拼接，可控制 prompt / sources 输出，并可选调用本地生成模型。
 - 命令行入口：
   - `validate-config`
@@ -34,7 +34,7 @@
 
 - 更细粒度的银行字段映射和数据质量规则
 - BGE-M3 embedding 与 reranker 微调
-- 重排序模型接入
+- rerank 训练与评估
 - 自适应检索策略
 - 生成模型加载策略优化
 - 评估指标与回归测试
@@ -107,7 +107,7 @@ pip install -r requirements.txt
 | `models` | 基础模型、嵌入模型、重排序模型、LoRA 适配器与 DPO 模型输出路径 |
 | `lora` | LoRA rank、alpha、dropout、学习率、批次大小和训练步数 |
 | `dpo` | DPO beta、学习率、批次大小和训练步数 |
-| `rag` | 知识源路径、分块大小、检索 top-k、MMR 参数、索引文件和向量库路径 |
+| `rag` | 知识源路径、分块大小、检索 top-k、MMR 参数、rerank 开关、索引文件和向量库路径 |
 | `inference` | 是否启用生成模型、模型路径、输出字段、生成温度、最大 token 数、top-p 和重复惩罚 |
 | `logging` | 日志级别、控制台/文件输出开关和日志文件路径 |
 | `evaluation` | 测试集路径和基线分数占位配置 |
@@ -250,13 +250,18 @@ python -m src.cli.main inference \
   --no-sources
 ```
 
-以下命令已声明，但数据处理模块尚未补齐：
+如果要启用重排序，在 `config.yaml` 中设置：
 
-```bash
-python -m src.cli.main process-data --config config.yaml
+```yaml
+rag:
+  enable_rerank: true
+  rerank_top_n: 5
+
+models:
+  rerank_model_path: "./models/bge-m3-reranker"
 ```
 
-`process-data` 需要先补充 `src/data/processor.py`。数据清洗、样例数据和测试会在拿到真实数据后继续完善。
+数据清洗、样例数据和测试会在拿到真实数据后继续完善。
 
 ## 开发说明
 

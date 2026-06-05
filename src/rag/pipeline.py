@@ -11,6 +11,7 @@ import numpy as np
 
 from src.config_manager import ConfigManager
 from src.logger import Logger
+from src.rag.reranker import Reranker
 
 
 @dataclass
@@ -351,6 +352,7 @@ class RAGRetriever:
         self._index = None
         self._chunks: List[Chunk] = []
         self._embedding_model: Optional[EmbeddingModel] = None
+        self._reranker: Optional[Reranker] = None
         self._chunk_vectors: Optional[np.ndarray] = None
 
     def retrieve(self, query: str, top_k: Optional[int] = None) -> List[RetrievalResult]:
@@ -385,6 +387,8 @@ class RAGRetriever:
         results: List[RetrievalResult] = []
         for index, score in selected:
             results.append(RetrievalResult(chunk=self._chunks[int(index)], score=float(score)))
+        if self.rag_cfg.get("enable_rerank", False):
+            results = self._rerank(query=query, results=results)
         return results
 
     def retrieve_as_dicts(self, query: str, top_k: Optional[int] = None) -> List[Dict[str, Any]]:
@@ -490,3 +494,12 @@ class RAGRetriever:
         norms = np.linalg.norm(vectors, axis=1, keepdims=True)
         norms[norms == 0] = 1.0
         return np.asarray(vectors / norms, dtype="float32")
+
+    def _rerank(self, query: str, results: List[RetrievalResult]) -> List[RetrievalResult]:
+        if self._reranker is None:
+            self._reranker = Reranker(
+                self.models_cfg.get("rerank_model_path", ""),
+                batch_size=int(self.rag_cfg.get("rerank_batch_size", 16)),
+            )
+        top_n = int(self.rag_cfg.get("rerank_top_n", len(results)))
+        return self._reranker.rerank(query=query, results=results, top_n=top_n)

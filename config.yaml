@@ -53,7 +53,9 @@ rag:
   retrieval_strategy: "mmr"  # 检索策略：similarity 或 mmr
   retrieval_fetch_k: 40  # MMR候选池大小
   mmr_lambda: 0.7  # MMR相关性权重，越高越偏向相似度
+  enable_rerank: false  # 是否启用重排序模型
   rerank_top_n: 5  # 重排序后保留的top-n块数
+  rerank_batch_size: 16  # 重排序批处理大小
   context_template: "参考信息：\n{context}\n\n问题：{question}\n答案："  # 上下文模板
   vector_db_path: "./data/vector_db"  # 向量数据库保存路径
   index_file: "index.faiss"  # FAISS索引文件名
