@@ -61,6 +61,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print index status before running retrieval",
     )
 
+    eval_parser = subparsers.add_parser(
+        "evaluate-retrieval",
+        help="Evaluate RAG retrieval quality",
+    )
+    eval_parser.add_argument("--config", default="config.yaml", help="Path to config file")
+    eval_parser.add_argument(
+        "--data-path",
+        default=None,
+        help="Override evaluation.retrieval_test_data_path",
+    )
+    eval_parser.add_argument("--top-k", type=int, default=None, help="Override evaluation top-k")
+
     inference_parser = subparsers.add_parser("inference", help="Run RAG retrieval/inference")
     inference_parser.add_argument("--config", default="config.yaml", help="Path to config file")
     inference_parser.add_argument("--query", required=True, help="User question")
@@ -139,6 +151,14 @@ def main() -> None:
         if args.status:
             payload["status"] = retriever.status()
         print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return
+
+    if args.command == "evaluate-retrieval":
+        from src.evaluation import RetrievalEvaluator
+
+        evaluator = RetrievalEvaluator(config_path=args.config)
+        summary = evaluator.evaluate(data_path=args.data_path, top_k=args.top_k)
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
         return
 
     if args.command == "inference":

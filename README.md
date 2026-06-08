@@ -21,6 +21,7 @@
 - `RAGIndexer`: 支持从 txt、md、json、jsonl 或目录读取知识源，按段落/句子边界切块，完成 embedding 和 FAISS 建库。
 - `RAGRetriever`: 加载本地 FAISS 索引并返回相关文本块，支持相似度检索、MMR 去重检索、可选 rerank 和索引状态查看。
 - `InferenceEngine`: 执行检索、上下文拼接，可控制 prompt / sources 输出，并可选调用本地生成模型。
+- `RetrievalEvaluator`: 基于标注 query 和相关文本计算 Hit Rate、Recall@k 和 MRR。
 - 命令行入口：
   - `validate-config`
   - `train-lora`
@@ -28,6 +29,7 @@
   - `process-data`
   - `setup-rag`
   - `query-rag`
+  - `evaluate-retrieval`
   - `inference`
 
 ### 规划中
@@ -37,7 +39,7 @@
 - rerank 训练与评估
 - 自适应检索策略
 - 生成模型加载策略优化
-- 评估指标与回归测试
+- 生成答案评估与回归测试
 
 ## 项目结构
 
@@ -219,6 +221,21 @@ python -m src.cli.main query-rag \
 ```
 
 `query-rag` 会返回命中的文本块、相似度分数、来源文件和索引状态，适合在接入生成模型前先检查检索质量。
+
+评估检索效果：
+
+```bash
+python -m src.cli.main evaluate-retrieval \
+  --config config.yaml \
+  --data-path ./data/retrieval_eval.jsonl \
+  --top-k 10
+```
+
+评估数据支持 JSON / JSONL，每条样本至少包含问题和相关文本：
+
+```json
+{"query": "企业贷款需要什么条件？", "relevant_texts": ["企业贷款通常需要营业执照、经营流水、征信和担保材料。"]}
+```
 
 执行检索增强推理：
 

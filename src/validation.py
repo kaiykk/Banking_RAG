@@ -21,6 +21,7 @@ class ConfigValidator:
         self._check_positive_int("rag.retrieval_fetch_k", errors)
         self._check_positive_int("rag.rerank_top_n", errors)
         self._check_positive_int("rag.rerank_batch_size", errors)
+        self._check_positive_int("evaluation.retrieval_top_k", errors)
         self._check_float_range("rag.mmr_lambda", 0.0, 1.0, errors)
 
         strategy = self._get("rag.retrieval_strategy")
@@ -53,6 +54,10 @@ class ConfigValidator:
                 warnings.append(
                     f"models.rerank_model_path 不存在，将依赖 Hugging Face 名称或运行时下载: {rerank_path}"
                 )
+
+        retrieval_eval_path = self._get("evaluation.retrieval_test_data_path")
+        if retrieval_eval_path and not Path(retrieval_eval_path).expanduser().exists():
+            warnings.append(f"evaluation.retrieval_test_data_path 不存在: {retrieval_eval_path}")
 
         return {
             "valid": not errors,

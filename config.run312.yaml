@@ -101,4 +101,6 @@ logging:
 # 评估配置
 evaluation:
   test_data_path: "./data/test_set.json"  # 测试集路径
+  retrieval_test_data_path: "./data/retrieval_eval.jsonl"  # 检索评估数据路径
+  retrieval_top_k: 10  # 检索评估top-k
   baseline_trulen_score: 67.2  # 基线TruLen分数
