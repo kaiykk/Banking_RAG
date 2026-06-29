@@ -21,9 +21,14 @@ class DataProcessor:
         self.data_cfg = self.config.get("data", {})
         self.logger = Logger.get_logger("DataProcessor", self.config.get("logging")).logger
 
-    def run(self, split: str = "train", max_samples: Optional[int] = None) -> Dict[str, Any]:
-        input_paths = self._resolve_input_paths(split)
-        rows = self._load_rows(input_paths)
+    def run(
+        self,
+        split: str = "train",
+        max_samples: Optional[int] = None,
+        input_paths: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        resolved_input_paths = self._resolve_input_paths(split, input_paths=input_paths)
+        rows = self._load_rows(resolved_input_paths)
         if max_samples is not None:
             rows = rows[:max_samples]
 
@@ -48,7 +53,7 @@ class DataProcessor:
         )
 
         summary = {
-            "input_paths": [str(path) for path in input_paths],
+            "input_paths": [str(path) for path in resolved_input_paths],
             "loaded_rows": len(rows),
             "processed_records": len(records),
             "lora_rows": len(lora_rows),
@@ -61,8 +66,14 @@ class DataProcessor:
         self.logger.info("Data processing summary: %s", summary)
         return summary
 
-    def _resolve_input_paths(self, split: str) -> List[Path]:
+    def _resolve_input_paths(
+        self,
+        split: str,
+        input_paths: Optional[List[str]] = None,
+    ) -> List[Path]:
         configured = (
+            input_paths
+            or
             self.data_cfg.get("input_paths")
             or self.data_cfg.get(f"{split}_input_paths")
             or self.data_cfg.get("raw_data_paths")

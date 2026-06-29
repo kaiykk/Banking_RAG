@@ -25,6 +25,7 @@ class RetrievalEvaluator:
         self,
         data_path: Optional[str] = None,
         top_k: Optional[int] = None,
+        output_path: Optional[str] = None,
     ) -> Dict[str, Any]:
         path = data_path or self.eval_cfg.get("retrieval_test_data_path") or self.eval_cfg.get(
             "test_data_path"
@@ -79,6 +80,10 @@ class RetrievalEvaluator:
             "mrr": reciprocal_rank_sum / total,
             "items": per_item,
         }
+        resolved_output_path = output_path or self.eval_cfg.get("retrieval_report_path")
+        if resolved_output_path:
+            self._write_report(summary, resolved_output_path)
+            summary["report_path"] = str(Path(resolved_output_path))
         self.logger.info("Retrieval evaluation summary: %s", summary)
         return summary
 
@@ -141,3 +146,12 @@ class RetrievalEvaluator:
     @staticmethod
     def _normalize_text(text: str) -> str:
         return " ".join(str(text).split())
+
+    @staticmethod
+    def _write_report(summary: Dict[str, Any], path: str) -> None:
+        output_path = Path(path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(
+            json.dumps(summary, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )

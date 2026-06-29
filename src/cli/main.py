@@ -20,6 +20,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Max number of samples to process",
     )
+    process_parser.add_argument(
+        "--input-paths",
+        nargs="+",
+        default=None,
+        help="Override data.input_paths with JSON/JSONL/CSV/TSV files or directories",
+    )
 
     lora_parser = subparsers.add_parser("train-lora", help="Run LoRA training")
     lora_parser.add_argument("--config", default="config.yaml", help="Path to config file")
@@ -72,6 +78,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Override evaluation.retrieval_test_data_path",
     )
     eval_parser.add_argument("--top-k", type=int, default=None, help="Override evaluation top-k")
+    eval_parser.add_argument(
+        "--output",
+        default=None,
+        help="Write evaluation report JSON to this path",
+    )
 
     inference_parser = subparsers.add_parser("inference", help="Run RAG retrieval/inference")
     inference_parser.add_argument("--config", default="config.yaml", help="Path to config file")
@@ -115,7 +126,11 @@ def main() -> None:
         from src.data.processor import DataProcessor
 
         processor = DataProcessor(config_path=args.config)
-        summary = processor.run(split=args.split, max_samples=args.max_samples)
+        summary = processor.run(
+            split=args.split,
+            max_samples=args.max_samples,
+            input_paths=args.input_paths,
+        )
         print(json.dumps(summary, ensure_ascii=False, indent=2))
         return
 
@@ -157,7 +172,11 @@ def main() -> None:
         from src.evaluation import RetrievalEvaluator
 
         evaluator = RetrievalEvaluator(config_path=args.config)
-        summary = evaluator.evaluate(data_path=args.data_path, top_k=args.top_k)
+        summary = evaluator.evaluate(
+            data_path=args.data_path,
+            top_k=args.top_k,
+            output_path=args.output,
+        )
         print(json.dumps(summary, ensure_ascii=False, indent=2))
         return
 

@@ -150,6 +150,7 @@ python -m src.cli.main validate-config --config config.yaml
 ```bash
 python -m src.cli.main process-data \
   --config config.yaml \
+  --input-paths ./data/raw/banking_qa.jsonl \
   --max-samples 100
 ```
 
@@ -228,7 +229,8 @@ python -m src.cli.main query-rag \
 python -m src.cli.main evaluate-retrieval \
   --config config.yaml \
   --data-path ./data/retrieval_eval.jsonl \
-  --top-k 10
+  --top-k 10 \
+  --output ./data/reports/retrieval_eval_report.json
 ```
 
 评估数据支持 JSON / JSONL，每条样本至少包含问题和相关文本：
