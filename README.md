@@ -12,7 +12,7 @@
 
 ### 已实现
 
-- `ConfigManager`: 支持 YAML / JSON 配置加载、必填项校验、默认值补齐和点号路径读取。
+- `ConfigManager`: 支持 YAML / JSON 配置加载、必填项校验、默认值补齐、点号路径读取、`config.local.yaml` 本地覆盖和 `BANKING_RAG__...` 环境变量覆盖。
 - `Logger`: 统一控制台与文件日志输出。
 - `LoRATrainer`: 基于 `transformers`、`datasets`、`peft` 的因果语言模型 LoRA 微调流程。
 - `DPOOptimizer`: 基于 `trl` 的 DPO 偏好优化流程，兼容不同版本 `DPOTrainer` 的 `tokenizer` / `processing_class` 参数。
@@ -129,6 +129,27 @@ data:
 rag:
   source_paths:
     - "./data/processed/knowledge.jsonl"
+```
+
+如果本地路径、密钥或实验参数不希望提交到 Git，可以新建 `config.local.yaml`，它会自动覆盖 `config.yaml` 中的同名字段：
+
+```yaml
+data:
+  input_paths:
+    - "./data/raw/local_banking_qa.jsonl"
+  field_mapping:
+    question: ["用户问题", "question"]
+    answer: ["标准答案", "answer"]
+    rejected: ["错误答案"]
+    source: ["来源"]
+    category: ["业务类型"]
+```
+
+也可以用环境变量临时覆盖配置，格式是 `BANKING_RAG__配置段__配置项`：
+
+```bash
+export BANKING_RAG__RAG__RETRIEVAL_TOP_K=5
+export BANKING_RAG__INFERENCE__USE_GENERATION=false
 ```
 
 ## 命令行用法

@@ -19,6 +19,7 @@ class DataProcessor:
     def __init__(self, config_path: str = "config.yaml") -> None:
         self.config = ConfigManager(config_path).get_all()
         self.data_cfg = self.config.get("data", {})
+        self.field_mapping = self.data_cfg.get("field_mapping", {})
         self.logger = Logger.get_logger("DataProcessor", self.config.get("logging")).logger
 
     def run(
@@ -73,8 +74,7 @@ class DataProcessor:
     ) -> List[Path]:
         configured = (
             input_paths
-            or
-            self.data_cfg.get("input_paths")
+            or self.data_cfg.get("input_paths")
             or self.data_cfg.get(f"{split}_input_paths")
             or self.data_cfg.get("raw_data_paths")
             or []
@@ -127,18 +127,28 @@ class DataProcessor:
         raise ValueError(f"暂不支持的数据文件类型: {path}")
 
     def _normalize_row(self, row: Dict[str, Any]) -> Optional[Dict[str, str]]:
-        question = self._first_value(row, self.QUESTION_FIELDS)
-        answer = self._first_value(row, self.ANSWER_FIELDS)
-        rejected = self._first_value(row, self.REJECTED_FIELDS)
+        question = self._first_value(row, self._fields_for("question", self.QUESTION_FIELDS))
+        answer = self._first_value(row, self._fields_for("answer", self.ANSWER_FIELDS))
+        rejected = self._first_value(row, self._fields_for("rejected", self.REJECTED_FIELDS))
         if not question or not answer:
             return None
         return {
             "question": question,
             "answer": answer,
             "rejected": rejected,
-            "source": str(row.get("source") or row.get("来源") or ""),
-            "category": str(row.get("category") or row.get("业务类型") or ""),
+            "source": self._first_value(row, self._fields_for("source", ["source", "来源"])),
+            "category": self._first_value(row, self._fields_for("category", ["category", "业务类型"])),
         }
+
+    def _fields_for(self, logical_name: str, defaults: List[str]) -> List[str]:
+        configured = self.field_mapping.get(logical_name)
+        if not configured:
+            return defaults
+        if isinstance(configured, str):
+            configured_fields = [configured]
+        else:
+            configured_fields = [str(field) for field in configured]
+        return configured_fields + [field for field in defaults if field not in configured_fields]
 
     @staticmethod
     def _first_value(row: Dict[str, Any], fields: List[str]) -> str:

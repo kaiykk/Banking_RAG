@@ -29,6 +29,9 @@ class ConfigValidator:
             errors.append("rag.retrieval_strategy 仅支持 similarity 或 mmr。")
 
         input_paths = self._get("data.input_paths", [])
+        field_mapping = self._get("data.field_mapping", {})
+        if field_mapping and not isinstance(field_mapping, dict):
+            errors.append("data.field_mapping 必须是字典。")
         if not input_paths:
             warnings.append("data.input_paths 为空，process-data 暂无原始数据入口。")
         else:

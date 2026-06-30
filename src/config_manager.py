@@ -23,6 +23,8 @@ class ConfigManager:
         self.config_path = config_path
         self.config: Dict[str, Any] = {}
         self._load_config()
+        self._load_local_override()
+        self._apply_env_overrides()
         self._validate_config()
         self._apply_defaults()
     
@@ -43,6 +45,34 @@ class ConfigManager:
                     raise ValueError(f"不支持的配置文件格式: {file_ext}")
         except Exception as e:
             raise RuntimeError(f"加载配置文件失败: {str(e)}")
+
+    def _load_local_override(self):
+        """加载同目录本地覆盖配置，例如 config.local.yaml。"""
+        base_path = Path(self.config_path)
+        candidates = [
+            base_path.with_name(f"{base_path.stem}.local{base_path.suffix}"),
+            base_path.with_name("config.local.yaml"),
+        ]
+        for local_path in candidates:
+            if not local_path.exists() or local_path == base_path:
+                continue
+            with open(local_path, "r", encoding="utf-8") as f:
+                local_config = yaml.safe_load(f) or {}
+            if not isinstance(local_config, dict):
+                raise ValueError(f"本地配置必须是字典结构: {local_path}")
+            self.config = self._deep_merge(self.config, local_config)
+            break
+
+    def _apply_env_overrides(self):
+        """用 BANKING_RAG__SECTION__KEY=value 覆盖配置。"""
+        prefix = "BANKING_RAG__"
+        for env_key, raw_value in os.environ.items():
+            if not env_key.startswith(prefix):
+                continue
+            key_path = env_key[len(prefix):].lower().split("__")
+            if not key_path:
+                continue
+            self._set_nested(self.config, key_path, self._parse_env_value(raw_value))
     
     def _validate_config(self):
         """验证配置的有效性"""
@@ -158,3 +188,34 @@ class ConfigManager:
                 yaml.dump(self.config, f, allow_unicode=True, default_flow_style=False)
             elif file_ext == '.json':
                 json.dump(self.config, f, ensure_ascii=False, indent=2)
+
+    @classmethod
+    def _deep_merge(cls, base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+        merged = dict(base)
+        for key, value in override.items():
+            if isinstance(value, dict) and isinstance(merged.get(key), dict):
+                merged[key] = cls._deep_merge(merged[key], value)
+            else:
+                merged[key] = value
+        return merged
+
+    @staticmethod
+    def _set_nested(config: Dict[str, Any], keys: list, value: Any) -> None:
+        current = config
+        for key in keys[:-1]:
+            if key not in current or not isinstance(current[key], dict):
+                current[key] = {}
+            current = current[key]
+        current[keys[-1]] = value
+
+    @staticmethod
+    def _parse_env_value(value: str) -> Any:
+        text = value.strip()
+        if text.lower() in {"true", "false"}:
+            return text.lower() == "true"
+        if text.lower() in {"none", "null"}:
+            return None
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            return value
