@@ -33,11 +33,23 @@ class DataProcessor:
         if max_samples is not None:
             rows = rows[:max_samples]
 
-        records = [record for row in rows if (record := self._normalize_row(row))]
+        records: List[Dict[str, str]] = []
+        dropped_missing_fields = 0
+        for row in rows:
+            record = self._normalize_row(row)
+            if record is None:
+                dropped_missing_fields += 1
+                continue
+            records.append(record)
+
+        before_banking_filter = len(records)
         if self.data_cfg.get("filter_banking", True):
             records = [record for record in records if self._is_banking_related(record)]
+        dropped_non_banking = before_banking_filter - len(records)
 
+        before_dedup = len(records)
         records = self._deduplicate(records)
+        dropped_duplicates = before_dedup - len(records)
         lora_rows = [self._to_lora_row(record) for record in records]
         dpo_rows = [
             self._to_dpo_row(record)
@@ -56,6 +68,9 @@ class DataProcessor:
         summary = {
             "input_paths": [str(path) for path in resolved_input_paths],
             "loaded_rows": len(rows),
+            "dropped_missing_fields": dropped_missing_fields,
+            "dropped_non_banking": dropped_non_banking,
+            "dropped_duplicates": dropped_duplicates,
             "processed_records": len(records),
             "lora_rows": len(lora_rows),
             "dpo_rows": len(dpo_rows),

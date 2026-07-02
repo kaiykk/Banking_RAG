@@ -251,7 +251,8 @@ python -m src.cli.main evaluate-retrieval \
   --config config.yaml \
   --data-path ./data/retrieval_eval.jsonl \
   --top-k 10 \
-  --output ./data/reports/retrieval_eval_report.json
+  --output ./data/reports/retrieval_eval_report.json \
+  --markdown-output ./data/reports/retrieval_eval_report.md
 ```
 
 评估数据支持 JSON / JSONL，每条样本至少包含问题和相关文本：

@@ -26,6 +26,7 @@ class RetrievalEvaluator:
         data_path: Optional[str] = None,
         top_k: Optional[int] = None,
         output_path: Optional[str] = None,
+        markdown_path: Optional[str] = None,
     ) -> Dict[str, Any]:
         path = data_path or self.eval_cfg.get("retrieval_test_data_path") or self.eval_cfg.get(
             "test_data_path"
@@ -84,6 +85,10 @@ class RetrievalEvaluator:
         if resolved_output_path:
             self._write_report(summary, resolved_output_path)
             summary["report_path"] = str(Path(resolved_output_path))
+        resolved_markdown_path = markdown_path or self.eval_cfg.get("retrieval_markdown_report_path")
+        if resolved_markdown_path:
+            self._write_markdown_report(summary, resolved_markdown_path)
+            summary["markdown_report_path"] = str(Path(resolved_markdown_path))
         self.logger.info("Retrieval evaluation summary: %s", summary)
         return summary
 
@@ -155,3 +160,27 @@ class RetrievalEvaluator:
             json.dumps(summary, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+
+    @staticmethod
+    def _write_markdown_report(summary: Dict[str, Any], path: str) -> None:
+        output_path = Path(path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        lines = [
+            "# 检索评估报告",
+            "",
+            f"- 样本数: {summary['examples']}",
+            f"- Top-K: {summary['top_k']}",
+            f"- Hit Rate: {summary['hit_rate']:.4f}",
+            f"- Recall@K: {summary['recall_at_k']:.4f}",
+            f"- MRR: {summary['mrr']:.4f}",
+            "",
+            "## 未命中样本",
+            "",
+        ]
+        misses = [item for item in summary["items"] if not item["hit"]]
+        if not misses:
+            lines.append("无。")
+        else:
+            for index, item in enumerate(misses, start=1):
+                lines.append(f"{index}. {item['query']}")
+        output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")

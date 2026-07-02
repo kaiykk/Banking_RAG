@@ -83,6 +83,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Write evaluation report JSON to this path",
     )
+    eval_parser.add_argument(
+        "--markdown-output",
+        default=None,
+        help="Write evaluation summary Markdown to this path",
+    )
 
     inference_parser = subparsers.add_parser("inference", help="Run RAG retrieval/inference")
     inference_parser.add_argument("--config", default="config.yaml", help="Path to config file")
@@ -176,6 +181,7 @@ def main() -> None:
             data_path=args.data_path,
             top_k=args.top_k,
             output_path=args.output,
+            markdown_path=args.markdown_output,
         )
         print(json.dumps(summary, ensure_ascii=False, indent=2))
         return
