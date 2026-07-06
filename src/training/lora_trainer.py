@@ -85,6 +85,8 @@ class LoRATrainer:
         records = self._load_sft_data(train_data_path)
         if not records:
             raise ValueError("No training records found in SFT data file.")
+        data_summary = self._summarize_sft_data(records)
+        self.logger.info("LoRA data summary: %s", data_summary)
 
         model, tokenizer = self.load_base_model()
         model = self.apply_lora_adapters(model)
@@ -130,11 +132,14 @@ class LoRATrainer:
         tokenizer.save_pretrained(output_path)
         self.logger.info("LoRA adapters saved to %s", output_path)
 
-        return {
+        summary = {
             "train_samples": len(records),
+            "data_summary": data_summary,
             "output_path": output_path,
             "data_path": train_data_path,
         }
+        self._write_summary(summary, output_path)
+        return summary
 
     @staticmethod
     def _build_sft_text(item: Dict[str, Any]) -> str:
@@ -150,4 +155,38 @@ class LoRATrainer:
             obj = json.load(file)
         if not isinstance(obj, list):
             raise ValueError("SFT data must be a list of JSON objects.")
-        return [x for x in obj if isinstance(x, dict)]
+        rows = [x for x in obj if isinstance(x, dict)]
+        valid_rows = []
+        for row in rows:
+            instruction = str(row.get("instruction", "")).strip()
+            output = str(row.get("output", "")).strip()
+            if instruction and output:
+                valid_rows.append(row)
+        return valid_rows
+
+    @staticmethod
+    def _summarize_sft_data(records: List[Dict[str, Any]]) -> Dict[str, Any]:
+        prompt_lengths = []
+        output_lengths = []
+        for record in records:
+            instruction = str(record.get("instruction", ""))
+            user_input = str(record.get("input", ""))
+            output = str(record.get("output", ""))
+            prompt_lengths.append(len(instruction) + len(user_input))
+            output_lengths.append(len(output))
+        return {
+            "samples": len(records),
+            "avg_prompt_chars": sum(prompt_lengths) / len(prompt_lengths),
+            "avg_output_chars": sum(output_lengths) / len(output_lengths),
+            "max_prompt_chars": max(prompt_lengths),
+            "max_output_chars": max(output_lengths),
+        }
+
+    @staticmethod
+    def _write_summary(summary: Dict[str, Any], output_path: str) -> None:
+        summary_path = Path(output_path) / "training_summary.json"
+        summary_path.parent.mkdir(parents=True, exist_ok=True)
+        summary_path.write_text(
+            json.dumps(summary, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )

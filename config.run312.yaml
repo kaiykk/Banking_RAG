@@ -33,6 +33,9 @@ lora:
   gradient_accumulation_steps: 4  # 梯度累积步数
   warmup_steps: 100  # 预热步数
   logging_steps: 10  # 日志记录间隔
+  max_length: 512  # 训练文本最大长度
+  save_steps: 200  # checkpoint保存间隔
+  target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]  # LoRA目标模块
 
 # DPO训练超参数
 dpo:
@@ -43,6 +46,9 @@ dpo:
   gradient_accumulation_steps: 8  # 梯度累积步数
   warmup_steps: 50  # 预热步数
   logging_steps: 10  # 日志记录间隔
+  max_length: 512  # DPO样本最大长度
+  max_prompt_length: 256  # DPO prompt最大长度
+  save_steps: 100  # checkpoint保存间隔
 
 # RAG配置
 rag:

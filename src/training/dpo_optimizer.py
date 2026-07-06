@@ -72,6 +72,8 @@ class DPOOptimizer:
         rows = self._load_pairwise_data(data_path)
         if not rows:
             raise ValueError("No DPO pairwise rows found.")
+        data_summary = self._summarize_pairwise_data(rows)
+        self.logger.info("DPO data summary: %s", data_summary)
 
         model, tokenizer = self.load_lora_model()
         dataset = Dataset.from_list(rows)
@@ -118,11 +120,14 @@ class DPOOptimizer:
         tokenizer.save_pretrained(output_path)
         self.logger.info("DPO model saved to %s", output_path)
 
-        return {
+        summary = {
             "train_pairs": len(rows),
+            "data_summary": data_summary,
             "output_path": output_path,
             "data_path": data_path,
         }
+        self._write_summary(summary, output_path)
+        return summary
 
     @staticmethod
     def _load_pairwise_data(path: str) -> List[Dict[str, str]]:
@@ -141,3 +146,29 @@ class DPOOptimizer:
             if prompt and chosen and rejected:
                 rows.append({"prompt": prompt, "chosen": chosen, "rejected": rejected})
         return rows
+
+    @staticmethod
+    def _summarize_pairwise_data(rows: List[Dict[str, str]]) -> Dict[str, Any]:
+        prompt_lengths = [len(row["prompt"]) for row in rows]
+        chosen_lengths = [len(row["chosen"]) for row in rows]
+        rejected_lengths = [len(row["rejected"]) for row in rows]
+        same_answer_pairs = sum(1 for row in rows if row["chosen"] == row["rejected"])
+        return {
+            "pairs": len(rows),
+            "avg_prompt_chars": sum(prompt_lengths) / len(prompt_lengths),
+            "avg_chosen_chars": sum(chosen_lengths) / len(chosen_lengths),
+            "avg_rejected_chars": sum(rejected_lengths) / len(rejected_lengths),
+            "max_prompt_chars": max(prompt_lengths),
+            "max_chosen_chars": max(chosen_lengths),
+            "max_rejected_chars": max(rejected_lengths),
+            "same_answer_pairs": same_answer_pairs,
+        }
+
+    @staticmethod
+    def _write_summary(summary: Dict[str, Any], output_path: str) -> None:
+        summary_path = Path(output_path) / "training_summary.json"
+        summary_path.parent.mkdir(parents=True, exist_ok=True)
+        summary_path.write_text(
+            json.dumps(summary, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )

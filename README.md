@@ -16,6 +16,7 @@
 - `Logger`: 统一控制台与文件日志输出。
 - `LoRATrainer`: 基于 `transformers`、`datasets`、`peft` 的因果语言模型 LoRA 微调流程。
 - `DPOOptimizer`: 基于 `trl` 的 DPO 偏好优化流程，兼容不同版本 `DPOTrainer` 的 `tokenizer` / `processing_class` 参数。
+- 训练模块会在训练前输出样本长度统计，并在输出目录写入 `training_summary.json`。
 - `DataProcessor`: 支持从 JSON、JSONL、CSV、TSV 或目录读取初始问答数据，输出 LoRA、DPO 和 RAG 知识源文件。
 - `ConfigValidator`: 检查核心配置、检索参数和关键路径，并输出结构化错误/提醒。
 - `RAGIndexer`: 支持从 txt、md、json、jsonl 或目录读取知识源，按段落/句子边界切块，完成 embedding 和 FAISS 建库。
