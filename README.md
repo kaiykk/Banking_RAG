@@ -190,6 +190,15 @@ python -m src.cli.main train-lora \
   --data-path ./data/processed/lora_data.json
 ```
 
+正式训练前可以先 dry-run，只检查数据并输出摘要，不加载模型：
+
+```bash
+python -m src.cli.main train-lora \
+  --config config.yaml \
+  --data-path ./data/processed/lora_data.json \
+  --dry-run
+```
+
 SFT 数据格式示例：
 
 ```json
@@ -208,6 +217,15 @@ SFT 数据格式示例：
 python -m src.cli.main train-dpo \
   --config config.yaml \
   --data-path ./data/processed/dpo_data.json
+```
+
+DPO 也支持 dry-run：
+
+```bash
+python -m src.cli.main train-dpo \
+  --config config.yaml \
+  --data-path ./data/processed/dpo_data.json \
+  --dry-run
 ```
 
 DPO 数据格式示例：

@@ -141,6 +141,20 @@ class LoRATrainer:
         self._write_summary(summary, output_path)
         return summary
 
+    def preview_data(self, data_path: Optional[str] = None) -> Dict[str, Any]:
+        """Validate and summarize LoRA data without loading a model."""
+        train_data_path = data_path or self.data_cfg.get(
+            "lora_output_path", "./data/processed/lora_data.json"
+        )
+        records = self._load_sft_data(train_data_path)
+        if not records:
+            raise ValueError("No training records found in SFT data file.")
+        return {
+            "mode": "dry_run",
+            "data_path": train_data_path,
+            "data_summary": self._summarize_sft_data(records),
+        }
+
     @staticmethod
     def _build_sft_text(item: Dict[str, Any]) -> str:
         instruction = item.get("instruction", "").strip()

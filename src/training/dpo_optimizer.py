@@ -129,6 +129,20 @@ class DPOOptimizer:
         self._write_summary(summary, output_path)
         return summary
 
+    def preview_data(self, pairwise_data_path: Optional[str] = None) -> Dict[str, Any]:
+        """Validate and summarize DPO data without loading a model."""
+        data_path = pairwise_data_path or self.data_cfg.get(
+            "dpo_output_path", "./data/processed/dpo_data.json"
+        )
+        rows = self._load_pairwise_data(data_path)
+        if not rows:
+            raise ValueError("No DPO pairwise rows found.")
+        return {
+            "mode": "dry_run",
+            "data_path": data_path,
+            "data_summary": self._summarize_pairwise_data(rows),
+        }
+
     @staticmethod
     def _load_pairwise_data(path: str) -> List[Dict[str, str]]:
         with open(path, "r", encoding="utf-8") as file:

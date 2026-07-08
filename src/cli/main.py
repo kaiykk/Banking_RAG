@@ -34,6 +34,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Override LoRA training data path (JSON)",
     )
+    lora_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Validate and summarize LoRA data without loading a model",
+    )
 
     dpo_parser = subparsers.add_parser("train-dpo", help="Run DPO training")
     dpo_parser.add_argument("--config", default="config.yaml", help="Path to config file")
@@ -41,6 +46,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--data-path",
         default=None,
         help="Override DPO pairwise data path (JSON)",
+    )
+    dpo_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Validate and summarize DPO data without loading a model",
     )
 
     rag_parser = subparsers.add_parser("setup-rag", help="Build local RAG vector index")
@@ -143,7 +153,11 @@ def main() -> None:
         from src.training.lora_trainer import LoRATrainer
 
         trainer = LoRATrainer(config_path=args.config)
-        summary = trainer.train(data_path=args.data_path)
+        summary = (
+            trainer.preview_data(data_path=args.data_path)
+            if args.dry_run
+            else trainer.train(data_path=args.data_path)
+        )
         print(json.dumps(summary, ensure_ascii=False, indent=2))
         return
 
@@ -151,7 +165,11 @@ def main() -> None:
         from src.training.dpo_optimizer import DPOOptimizer
 
         optimizer = DPOOptimizer(config_path=args.config)
-        summary = optimizer.train_with_preferences(pairwise_data_path=args.data_path)
+        summary = (
+            optimizer.preview_data(pairwise_data_path=args.data_path)
+            if args.dry_run
+            else optimizer.train_with_preferences(pairwise_data_path=args.data_path)
+        )
         print(json.dumps(summary, ensure_ascii=False, indent=2))
         return
 
