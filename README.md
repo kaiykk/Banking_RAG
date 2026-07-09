@@ -4,9 +4,9 @@
 
 - 用配置文件统一管理数据、模型、LoRA、DPO、RAG 和日志参数
 - 提供 LoRA SFT 与 DPO 偏好优化训练入口
-- 为后续银行领域数据处理、向量检索、重排序和推理服务预留 CLI 流程
+- 提供银行领域数据处理、向量检索、重排序、检索评估和推理编排的 CLI 流程
 
-> 当前代码仍处于实验/搭建阶段。`train-lora` 和 `train-dpo` 已有实现；`setup-rag` 与 `inference` 是预留命令；`process-data` 入口已声明，但依赖的 `src.data.processor` 模块尚未提交到仓库。
+> 当前代码仍处于实验/搭建阶段，适合先用小规模本地数据验证数据处理、检索、推理和训练链路；真实银行业务数据接入后仍需补充更系统的测试与评估样本。
 
 ## 功能概览
 
@@ -19,7 +19,7 @@
 - 训练模块会在训练前输出样本长度统计，并在输出目录写入 `training_summary.json`。
 - `DataProcessor`: 支持从 JSON、JSONL、CSV、TSV 或目录读取初始问答数据，输出 LoRA、DPO 和 RAG 知识源文件。
 - `ConfigValidator`: 检查核心配置、检索参数和关键路径，并输出结构化错误/提醒。
-- `RAGIndexer`: 支持从 txt、md、json、jsonl 或目录读取知识源，按段落/句子边界切块，完成 embedding 和 FAISS 建库。
+- `RAGIndexer`: 支持从 txt、md、json、jsonl 或目录读取知识源，按段落/句子边界切块，完成 embedding 和 FAISS 建库，并在 manifest 中记录来源级统计。
 - `RAGRetriever`: 加载本地 FAISS 索引并返回相关文本块，支持相似度检索、MMR 去重检索、可选 rerank 和索引状态查看。
 - `InferenceEngine`: 执行检索、上下文拼接，可控制 prompt / sources 输出，并可选调用本地生成模型。
 - `RetrievalEvaluator`: 基于标注 query 和相关文本计算 Hit Rate、Recall@k 和 MRR。

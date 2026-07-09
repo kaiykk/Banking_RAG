@@ -2,6 +2,7 @@
 
 import json
 import re
+import shutil
 from datetime import datetime, timezone
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -283,10 +284,8 @@ class RAGIndexer:
         index_path = vector_db_path / self.rag_cfg.get("index_file", "index.faiss")
         chunks_path = vector_db_path / self.rag_cfg.get("chunks_file", "chunks.json")
         manifest_path = vector_db_path / self.rag_cfg.get("manifest_file", "manifest.json")
-        if reset and vector_db_path.exists():
-            for child in vector_db_path.iterdir():
-                if child.is_file():
-                    child.unlink()
+        if reset:
+            self._reset_vector_db(vector_db_path)
         vector_db_path.mkdir(parents=True, exist_ok=True)
 
         documents = DocumentLoader().load_many(paths)
@@ -320,8 +319,14 @@ class RAGIndexer:
             "embedding_model_path": embedding_model_path,
             "embedding_dimension": int(vectors.shape[1]),
             "source_paths": paths,
+            "source_stats": self._summarize_sources(documents=documents, chunks=chunks),
+            "vector_db_path": str(vector_db_path),
+            "index_path": str(index_path),
+            "chunks_path": str(chunks_path),
+            "manifest_path": str(manifest_path),
             "index_file": index_path.name,
             "chunks_file": chunks_path.name,
+            "manifest_file": manifest_path.name,
             "retrieval_strategy": self.rag_cfg.get("retrieval_strategy", "similarity"),
             "chunk_max_chars": int(self.rag_cfg.get("chunk_max_chars", 1200)),
             "chunk_overlap_chars": int(self.rag_cfg.get("chunk_overlap_chars", 120)),
@@ -339,6 +344,38 @@ class RAGIndexer:
             "chunks_path": str(chunks_path),
             "manifest_path": str(manifest_path),
         }
+
+    @staticmethod
+    def _reset_vector_db(vector_db_path: Path) -> None:
+        """Remove old vector database artifacts before a full rebuild."""
+        if not vector_db_path.exists():
+            return
+        for child in vector_db_path.iterdir():
+            if child.is_dir():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
+
+    @staticmethod
+    def _summarize_sources(
+        documents: Sequence[Document],
+        chunks: Sequence[Chunk],
+    ) -> List[Dict[str, Any]]:
+        """Summarize document and chunk counts by source path."""
+        source_stats: Dict[str, Dict[str, Any]] = {}
+        for document in documents:
+            stats = source_stats.setdefault(
+                document.source,
+                {"source": document.source, "documents": 0, "chunks": 0},
+            )
+            stats["documents"] += 1
+        for chunk in chunks:
+            stats = source_stats.setdefault(
+                chunk.source,
+                {"source": chunk.source, "documents": 0, "chunks": 0},
+            )
+            stats["chunks"] += 1
+        return sorted(source_stats.values(), key=lambda item: item["source"])
 
 
 class RAGRetriever:
@@ -404,12 +441,21 @@ class RAGRetriever:
         manifest: Dict[str, Any] = {}
         if manifest_path.exists():
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        index_exists = index_path.exists()
+        chunks_exists = chunks_path.exists()
+        manifest_exists = manifest_path.exists()
         return {
-            "ready": index_path.exists() and chunks_path.exists(),
+            "ready": index_exists and chunks_exists,
+            "index_exists": index_exists,
+            "chunks_exists": chunks_exists,
+            "manifest_exists": manifest_exists,
             "index_path": str(index_path),
             "chunks_path": str(chunks_path),
             "manifest_path": str(manifest_path),
             "retrieval_strategy": self.rag_cfg.get("retrieval_strategy", "similarity"),
+            "document_count": manifest.get("documents"),
+            "chunk_count": manifest.get("chunks"),
+            "source_count": len(manifest.get("source_stats", [])),
             "manifest": manifest,
         }
 
