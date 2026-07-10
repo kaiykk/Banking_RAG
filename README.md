@@ -289,7 +289,15 @@ python -m src.cli.main inference \
   --top-k 5
 ```
 
-默认情况下，`inference` 只返回检索上下文和拼好的 prompt，不调用本地大模型。若已经准备好生成模型，可在配置中设置 `inference.model_path`，或使用默认 `models.dpo_model_path`，然后添加 `--generate`：
+默认情况下，`inference` 不调用本地大模型，会基于检索结果返回保守的参考要点、来源数量、检索来源和拼好的 prompt。参考要点只压缩命中的文本片段，不会扩展到检索材料之外。可通过以下配置控制摘要范围：
+
+```yaml
+inference:
+  retrieval_answer_max_sources: 3
+  retrieval_answer_excerpt_chars: 220
+```
+
+若已经准备好生成模型，可在配置中设置 `inference.model_path`，或使用默认 `models.dpo_model_path`，然后添加 `--generate`：
 
 ```bash
 python -m src.cli.main inference \

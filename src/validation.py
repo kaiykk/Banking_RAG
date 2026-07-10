@@ -22,6 +22,8 @@ class ConfigValidator:
         self._check_positive_int("rag.rerank_top_n", errors)
         self._check_positive_int("rag.rerank_batch_size", errors)
         self._check_positive_int("evaluation.retrieval_top_k", errors)
+        self._check_positive_int("inference.retrieval_answer_max_sources", errors)
+        self._check_positive_int("inference.retrieval_answer_excerpt_chars", errors)
         self._check_float_range("rag.mmr_lambda", 0.0, 1.0, errors)
 
         strategy = self._get("rag.retrieval_strategy")

@@ -87,6 +87,8 @@ inference:
   model_path: ""  # 可选：覆盖默认DPO模型路径
   include_prompt: true  # 输出中是否包含拼接后的prompt
   include_sources: true  # 输出中是否包含检索来源文本块
+  retrieval_answer_max_sources: 3  # 未启用生成模型时，答案摘要最多引用的来源数
+  retrieval_answer_excerpt_chars: 220  # 未启用生成模型时，每个来源摘要的最大字符数
   torch_dtype: ""  # 可选：float16/bfloat16/float32
   device_map: ""  # 可选：auto/cuda/cpu等transformers支持的device_map
 

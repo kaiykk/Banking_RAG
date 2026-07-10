@@ -90,10 +90,30 @@ class InferenceEngine:
         }
 
     @staticmethod
-    def _build_retrieval_only_answer(results: List[RetrievalResult]) -> str:
+    def _clean_excerpt(text: str, max_chars: int) -> str:
+        normalized = " ".join(text.split())
+        if len(normalized) <= max_chars:
+            return normalized
+        return normalized[: max_chars - 1].rstrip() + "..."
+
+    def _build_retrieval_only_answer(self, results: List[RetrievalResult]) -> str:
         if not results:
             return "未检索到可用参考信息。"
-        return "已完成检索，当前未启用本地生成模型。请根据 sources 中的上下文生成最终回答。"
+
+        max_sources = int(self.inference_cfg.get("retrieval_answer_max_sources", 3))
+        excerpt_chars = int(self.inference_cfg.get("retrieval_answer_excerpt_chars", 220))
+        max_sources = max(1, min(max_sources, len(results)))
+        excerpt_chars = max(80, excerpt_chars)
+
+        lines = [
+            "已完成检索，当前未启用本地生成模型。以下是按相关度整理的参考要点："
+        ]
+        for index, item in enumerate(results[:max_sources], start=1):
+            source_name = Path(item.chunk.source).name or item.chunk.source
+            excerpt = self._clean_excerpt(item.chunk.text, excerpt_chars)
+            lines.append(f"{index}. {excerpt}（来源: {source_name}，相关度: {item.score:.4f}）")
+        lines.append("请结合 sources 中的完整片段做最终判断，避免超出检索材料作答。")
+        return "\n".join(lines)
 
     def _resolve_bool(
         self,
