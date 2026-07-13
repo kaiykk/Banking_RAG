@@ -2,6 +2,26 @@
 
 import argparse
 import json
+from pathlib import Path
+from typing import Any, Dict
+
+
+def add_common_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--config", default="config.yaml", help="Path to config file")
+    parser.add_argument(
+        "--json-output",
+        default=None,
+        help="Optional path to write the command JSON summary",
+    )
+
+
+def emit_json(payload: Dict[str, Any], output_path: str | None = None) -> None:
+    text = json.dumps(payload, ensure_ascii=False, indent=2)
+    if output_path:
+        path = Path(output_path).expanduser()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text + "\n", encoding="utf-8")
+    print(text)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -9,10 +29,10 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     validate_parser = subparsers.add_parser("validate-config", help="Validate project config")
-    validate_parser.add_argument("--config", default="config.yaml", help="Path to config file")
+    add_common_options(validate_parser)
 
     process_parser = subparsers.add_parser("process-data", help="Run data processing pipeline")
-    process_parser.add_argument("--config", default="config.yaml", help="Path to config file")
+    add_common_options(process_parser)
     process_parser.add_argument("--split", default="train", help="Dataset split name")
     process_parser.add_argument(
         "--max-samples",
@@ -28,7 +48,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     lora_parser = subparsers.add_parser("train-lora", help="Run LoRA training")
-    lora_parser.add_argument("--config", default="config.yaml", help="Path to config file")
+    add_common_options(lora_parser)
     lora_parser.add_argument(
         "--data-path",
         default=None,
@@ -41,7 +61,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     dpo_parser = subparsers.add_parser("train-dpo", help="Run DPO training")
-    dpo_parser.add_argument("--config", default="config.yaml", help="Path to config file")
+    add_common_options(dpo_parser)
     dpo_parser.add_argument(
         "--data-path",
         default=None,
@@ -54,7 +74,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     rag_parser = subparsers.add_parser("setup-rag", help="Build local RAG vector index")
-    rag_parser.add_argument("--config", default="config.yaml", help="Path to config file")
+    add_common_options(rag_parser)
     rag_parser.add_argument(
         "--documents",
         nargs="+",
@@ -68,7 +88,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     query_rag_parser = subparsers.add_parser("query-rag", help="Query the local RAG index")
-    query_rag_parser.add_argument("--config", default="config.yaml", help="Path to config file")
+    add_common_options(query_rag_parser)
     query_rag_parser.add_argument("--query", required=True, help="Search query")
     query_rag_parser.add_argument("--top-k", type=int, default=None, help="Override retrieval top-k")
     query_rag_parser.add_argument(
@@ -81,7 +101,7 @@ def build_parser() -> argparse.ArgumentParser:
         "evaluate-retrieval",
         help="Evaluate RAG retrieval quality",
     )
-    eval_parser.add_argument("--config", default="config.yaml", help="Path to config file")
+    add_common_options(eval_parser)
     eval_parser.add_argument(
         "--data-path",
         default=None,
@@ -100,7 +120,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     inference_parser = subparsers.add_parser("inference", help="Run RAG retrieval/inference")
-    inference_parser.add_argument("--config", default="config.yaml", help="Path to config file")
+    add_common_options(inference_parser)
     inference_parser.add_argument("--query", required=True, help="User question")
     inference_parser.add_argument("--top-k", type=int, default=None, help="Override retrieval top-k")
     inference_parser.add_argument(
@@ -134,7 +154,7 @@ def main() -> None:
         from src.validation import ConfigValidator
 
         summary = ConfigValidator(config_path=args.config).validate()
-        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        emit_json(summary, args.json_output)
         return
 
     if args.command == "process-data":
@@ -146,7 +166,7 @@ def main() -> None:
             max_samples=args.max_samples,
             input_paths=args.input_paths,
         )
-        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        emit_json(summary, args.json_output)
         return
 
     if args.command == "train-lora":
@@ -158,7 +178,7 @@ def main() -> None:
             if args.dry_run
             else trainer.train(data_path=args.data_path)
         )
-        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        emit_json(summary, args.json_output)
         return
 
     if args.command == "train-dpo":
@@ -170,7 +190,7 @@ def main() -> None:
             if args.dry_run
             else optimizer.train_with_preferences(pairwise_data_path=args.data_path)
         )
-        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        emit_json(summary, args.json_output)
         return
 
     if args.command == "setup-rag":
@@ -178,7 +198,7 @@ def main() -> None:
 
         indexer = RAGIndexer(config_path=args.config)
         summary = indexer.build(source_paths=args.documents, reset=args.reset)
-        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        emit_json(summary, args.json_output)
         return
 
     if args.command == "query-rag":
@@ -188,7 +208,7 @@ def main() -> None:
         payload = {"results": retriever.retrieve_as_dicts(query=args.query, top_k=args.top_k)}
         if args.status:
             payload["status"] = retriever.status()
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        emit_json(payload, args.json_output)
         return
 
     if args.command == "evaluate-retrieval":
@@ -201,7 +221,7 @@ def main() -> None:
             output_path=args.output,
             markdown_path=args.markdown_output,
         )
-        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        emit_json(summary, args.json_output)
         return
 
     if args.command == "inference":
@@ -215,7 +235,7 @@ def main() -> None:
             include_prompt=False if args.no_prompt else None,
             include_sources=False if args.no_sources else None,
         )
-        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        emit_json(summary, args.json_output)
         return
 
     raise NotImplementedError(

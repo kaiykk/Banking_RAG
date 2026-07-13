@@ -167,6 +167,14 @@ python -m src.cli.main --help
 python -m src.cli.main validate-config --config config.yaml
 ```
 
+主要命令都支持 `--json-output`，可以在脚本或定时任务中把本次执行摘要落盘，同时保留终端输出：
+
+```bash
+python -m src.cli.main validate-config \
+  --config config.yaml \
+  --json-output ./data/reports/config_validation.json
+```
+
 处理本地问答数据：
 
 ```bash
