@@ -15,11 +15,14 @@ class DataProcessor:
     QUESTION_FIELDS = ["question", "query", "instruction", "prompt", "title", "问题"]
     ANSWER_FIELDS = ["answer", "output", "response", "chosen", "content", "答案"]
     REJECTED_FIELDS = ["rejected", "bad_answer", "negative", "错误答案"]
+    SUPPORTED_SUFFIXES = {".json", ".jsonl", ".csv", ".tsv"}
+    JSON_ROW_KEYS = ["data", "records", "items", "rows", "examples", "train"]
 
     def __init__(self, config_path: str = "config.yaml") -> None:
         self.config = ConfigManager(config_path).get_all()
         self.data_cfg = self.config.get("data", {})
         self.field_mapping = self.data_cfg.get("field_mapping", {})
+        self._source_stats: List[Dict[str, Any]] = []
         self.logger = Logger.get_logger("DataProcessor", self.config.get("logging")).logger
 
     def run(
@@ -30,6 +33,7 @@ class DataProcessor:
     ) -> Dict[str, Any]:
         resolved_input_paths = self._resolve_input_paths(split, input_paths=input_paths)
         rows = self._load_rows(resolved_input_paths)
+        loaded_rows_before_limit = len(rows)
         if max_samples is not None:
             rows = rows[:max_samples]
 
@@ -68,6 +72,8 @@ class DataProcessor:
         summary = {
             "input_paths": [str(path) for path in resolved_input_paths],
             "loaded_rows": len(rows),
+            "loaded_rows_before_limit": loaded_rows_before_limit,
+            "source_stats": self._source_stats,
             "dropped_missing_fields": dropped_missing_fields,
             "dropped_non_banking": dropped_non_banking,
             "dropped_duplicates": dropped_duplicates,
@@ -103,18 +109,23 @@ class DataProcessor:
 
     def _load_rows(self, paths: Iterable[Path]) -> List[Dict[str, Any]]:
         rows: List[Dict[str, Any]] = []
+        self._source_stats = []
         for path in paths:
             if path.is_dir():
                 for file_path in sorted(path.rglob("*")):
-                    if file_path.is_file() and file_path.suffix.lower() in {
-                        ".json",
-                        ".jsonl",
-                        ".csv",
-                        ".tsv",
-                    }:
-                        rows.extend(self._load_file(file_path))
+                    if (
+                        file_path.is_file()
+                        and file_path.suffix.lower() in self.SUPPORTED_SUFFIXES
+                    ):
+                        file_rows = self._load_file(file_path)
+                        self._source_stats.append(
+                            {"path": str(file_path), "loaded_rows": len(file_rows)}
+                        )
+                        rows.extend(file_rows)
             elif path.is_file():
-                rows.extend(self._load_file(path))
+                file_rows = self._load_file(path)
+                self._source_stats.append({"path": str(path), "loaded_rows": len(file_rows)})
+                rows.extend(file_rows)
             else:
                 raise FileNotFoundError(f"原始数据路径不存在: {path}")
         return rows
@@ -123,15 +134,18 @@ class DataProcessor:
         suffix = path.suffix.lower()
         if suffix == ".json":
             obj = json.loads(path.read_text(encoding="utf-8"))
-            rows = obj if isinstance(obj, list) else [obj]
+            rows = self._extract_json_rows(obj)
             return [row for row in rows if isinstance(row, dict)]
         if suffix == ".jsonl":
             rows = []
             with path.open("r", encoding="utf-8") as file:
-                for line in file:
+                for line_no, line in enumerate(file, start=1):
                     line = line.strip()
                     if line:
-                        obj = json.loads(line)
+                        try:
+                            obj = json.loads(line)
+                        except json.JSONDecodeError as exc:
+                            raise ValueError(f"JSONL 解析失败: {path}:{line_no} - {exc}") from exc
                         if isinstance(obj, dict):
                             rows.append(obj)
             return rows
@@ -140,6 +154,18 @@ class DataProcessor:
             with path.open("r", encoding="utf-8-sig", newline="") as file:
                 return list(csv.DictReader(file, delimiter=delimiter))
         raise ValueError(f"暂不支持的数据文件类型: {path}")
+
+    @classmethod
+    def _extract_json_rows(cls, obj: Any) -> List[Any]:
+        if isinstance(obj, list):
+            return obj
+        if isinstance(obj, dict):
+            for key in cls.JSON_ROW_KEYS:
+                value = obj.get(key)
+                if isinstance(value, list):
+                    return value
+            return [obj]
+        return []
 
     def _normalize_row(self, row: Dict[str, Any]) -> Optional[Dict[str, str]]:
         question = self._first_value(row, self._fields_for("question", self.QUESTION_FIELDS))
@@ -232,7 +258,7 @@ class DataProcessor:
 
     @staticmethod
     def _write_json(rows: List[Dict[str, str]], path: str) -> Path:
-        output_path = Path(path)
+        output_path = Path(path).expanduser()
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(
             json.dumps(rows, ensure_ascii=False, indent=2),
@@ -242,7 +268,7 @@ class DataProcessor:
 
     @staticmethod
     def _write_jsonl(rows: List[Dict[str, str]], path: str) -> Path:
-        output_path = Path(path)
+        output_path = Path(path).expanduser()
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with output_path.open("w", encoding="utf-8") as file:
             for row in rows:

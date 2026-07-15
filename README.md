@@ -190,6 +190,8 @@ python -m src.cli.main process-data \
 - `data.dpo_output_path`
 - `data.knowledge_output_path`
 
+JSON 文件既支持顶层数组，也支持 `data`、`records`、`items`、`rows`、`examples`、`train` 等字段包裹的数组。处理摘要会返回 `source_stats`，用于查看每个输入文件加载了多少条记录。
+
 运行 LoRA 微调：
 
 ```bash
